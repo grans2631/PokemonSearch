@@ -1,12 +1,12 @@
 @{
     RootModule = 'PokemonSearch.psm1'
-    ModuleVersion = '0.1.0'
+    ModuleVersion = '0.1.1'
     GUID = '5a91db0c-46aa-4bea-9b4e-fda0952af6e2'
     Author = 'Josh Gransbury'
     CompanyName = 'Community'
     Copyright = '(c) 2026. All rights reserved.'
     Description = 'PowerShell toolkit for searching, identifying, pricing, bidding on, and tracking Pokemon trading cards.'
-    PowerShellVersion = '7.2'
+    PowerShellVersion = '5.1'
     FunctionsToExport = @(
         'Get-PokemonSearchConfig',
         'Set-PokemonSearchConfig',
