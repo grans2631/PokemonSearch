@@ -5,9 +5,33 @@ function Find-PokemonCard {
         [ValidateRange(1,250)][int]$PageSize = 50,[switch]$BypassCache
     )
     if (-not ($Name -or $SetName -or $SetId -or $Number -or $Rarity)) { throw 'Provide at least one search field: Name, SetName, SetId, Number, or Rarity.' }
+
     $q = New-PokemonTcgSearchQuery -Name $Name -SetName $SetName -SetId $SetId -Number $Number -Rarity $Rarity
-    $response = Invoke-PokemonTcgRequest -Endpoint 'cards' -Query @{ q=$q; pageSize=$PageSize } -BypassCache:$BypassCache
-    foreach ($card in @($response.data)) { ConvertFrom-PokemonTcgCard -Card $card }
+    try {
+        $response = Invoke-PokemonTcgRequest -Endpoint 'cards' -Query @{ q=$q; pageSize=$PageSize } -BypassCache:$BypassCache
+    }
+    catch {
+        if (-not $Name -or $Name -notmatch '\s') { throw }
+
+        $nameClauses = @()
+        foreach ($token in ($Name -split '\s+')) {
+            if ($token) {
+                $safeToken = $token.Replace('"','\"')
+                $nameClauses += ('name:{0}' -f $safeToken)
+            }
+        }
+
+        $otherClauses = New-PokemonTcgSearchQuery -SetName $SetName -SetId $SetId -Number $Number -Rarity $Rarity
+        $fallbackQuery = ((@($nameClauses) + @($otherClauses)) | Where-Object { $_ }) -join ' '
+        Write-Verbose "Primary Pokemon TCG query failed; retrying with tokenized name query: $fallbackQuery"
+        $response = Invoke-PokemonTcgRequest -Endpoint 'cards' -Query @{ q=$fallbackQuery; pageSize=$PageSize } -BypassCache:$BypassCache
+    }
+
+    $cards = @($response.data | ForEach-Object { ConvertFrom-PokemonTcgCard -Card $_ })
+    if ($Name) {
+        $cards = @($cards | Where-Object { $_.Name -ieq $Name -or $_.Name -like "*$Name*" })
+    }
+    $cards
 }
 
 function Get-PokemonCard {
