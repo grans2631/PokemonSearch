@@ -28,7 +28,8 @@ function Invoke-EbayBrowseSearchInternal {
     $headers = @{ Authorization = "Bearer $token"; 'X-EBAY-C-MARKETPLACE-ID' = $settings.EbayMarketplaceId }
     $params = @{ q=$Query; limit=$Limit }
     $uri = 'https://api.ebay.com/buy/browse/v1/item_summary/search?' + (ConvertTo-PokemonSearchQueryString -Parameters $params)
-    Invoke-PokemonSearchRestMethod -Uri $uri -Headers $headers -CacheMinutes ([math]::Min($settings.CacheMinutes, 10)) -CacheIdentity ("ebay:$($settings.EbayMarketplaceId):$Query:$Limit")
+    $cacheIdentity = 'ebay:{0}:{1}:{2}' -f $settings.EbayMarketplaceId, $Query, $Limit
+    Invoke-PokemonSearchRestMethod -Uri $uri -Headers $headers -CacheMinutes ([math]::Min($settings.CacheMinutes, 10)) -CacheIdentity $cacheIdentity
 }
 
 function Invoke-EbayImageSearchInternal {
