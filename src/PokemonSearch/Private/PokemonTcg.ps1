@@ -20,16 +20,31 @@ function Invoke-PokemonTcgRequest {
 
 function New-PokemonTcgSearchQuery {
     param([string]$Name,[string]$SetName,[string]$SetId,[string]$Number,[string]$Rarity)
-    $clauses = [System.Collections.Generic.List[string]]::new()
+
+    $clauses = New-Object 'System.Collections.Generic.List[string]'
     foreach ($pair in @(
-        @{ Field='name'; Value=$Name }, @{ Field='set.name'; Value=$SetName }, @{ Field='set.id'; Value=$SetId },
-        @{ Field='number'; Value=$Number }, @{ Field='rarity'; Value=$Rarity }
+        @{ Field='name'; Value=$Name },
+        @{ Field='set.name'; Value=$SetName },
+        @{ Field='set.id'; Value=$SetId },
+        @{ Field='number'; Value=$Number },
+        @{ Field='rarity'; Value=$Rarity }
     )) {
-        if ($pair.Value) {
-            $safe = ([string]$pair.Value).Replace('"','\"')
+        if (-not $pair.Value) { continue }
+
+        $safe = ([string]$pair.Value).Replace('"','\"')
+
+        # The Pokemon TCG API documentation uses unquoted values for
+        # single tokens (name:Pikachu) and quotes for phrases
+        # (name:"Mewtwo ex"). Following that form also avoids some
+        # legacy API 500 responses observed with quoted single tokens.
+        if ($safe -match '\s') {
             $clauses.Add(('{0}:"{1}"' -f $pair.Field, $safe))
         }
+        else {
+            $clauses.Add(('{0}:{1}' -f $pair.Field, $safe))
+        }
     }
+
     $clauses -join ' '
 }
 
@@ -39,13 +54,34 @@ function ConvertFrom-PokemonTcgCard {
     if ($Card.tcgplayer -and $Card.tcgplayer.prices) {
         foreach ($property in $Card.tcgplayer.prices.PSObject.Properties) {
             $price = $property.Value
-            $variants += [pscustomobject]@{ Variant=$property.Name; Low=$price.low; Mid=$price.mid; High=$price.high; Market=$price.market; DirectLow=$price.directLow }
+            $variants += [pscustomobject]@{
+                Variant=$property.Name
+                Low=$price.low
+                Mid=$price.mid
+                High=$price.high
+                Market=$price.market
+                DirectLow=$price.directLow
+            }
         }
     }
+
     [pscustomobject]@{
-        Id=$Card.id; Name=$Card.name; SetId=$Card.set.id; SetName=$Card.set.name; Series=$Card.set.series; Number=$Card.number;
-        Rarity=$Card.rarity; Supertype=$Card.supertype; Subtypes=@($Card.subtypes); Artist=$Card.artist; ImageSmall=$Card.images.small;
-        ImageLarge=$Card.images.large; TcgPlayerUrl=$Card.tcgplayer.url; TcgPlayerUpdated=$Card.tcgplayer.updatedAt; PriceVariants=$variants; Raw=$Card
+        Id=$Card.id
+        Name=$Card.name
+        SetId=$Card.set.id
+        SetName=$Card.set.name
+        Series=$Card.set.series
+        Number=$Card.number
+        Rarity=$Card.rarity
+        Supertype=$Card.supertype
+        Subtypes=@($Card.subtypes)
+        Artist=$Card.artist
+        ImageSmall=$Card.images.small
+        ImageLarge=$Card.images.large
+        TcgPlayerUrl=$Card.tcgplayer.url
+        TcgPlayerUpdated=$Card.tcgplayer.updatedAt
+        PriceVariants=$variants
+        Raw=$Card
     }
 }
 
