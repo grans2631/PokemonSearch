@@ -1,0 +1,15 @@
+{
+  "PokemonTcgApiKey": "",
+  "PriceChartingToken": "",
+  "EbayClientId": "",
+  "EbayClientSecret": "",
+  "EbayMarketplaceId": "EBAY_US",
+  "CacheMinutes": 30,
+  "CollectionPath": "C:\\Users\\YOUR_USER\\.pokemonsearch\\collection.json",
+  "TargetDiscountPercent": 20,
+  "ExcellentBuyPercent": 28,
+  "GoodBuyPercent": 20,
+  "AcceptableBuyPercent": 12,
+  "PythonPath": "python",
+  "TesseractPath": ""
+}
