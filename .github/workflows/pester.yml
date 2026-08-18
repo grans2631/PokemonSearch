@@ -11,6 +11,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Windows PowerShell 5.1 import smoke test
+        shell: powershell
+        run: |
+          Import-Module .\src\PokemonSearch\PokemonSearch.psd1 -Force
+          Get-Command -Module PokemonSearch | Out-String | Write-Host
       - name: Install Pester
         shell: pwsh
         run: Install-Module Pester -Force -Scope CurrentUser -MinimumVersion 5.5.0
