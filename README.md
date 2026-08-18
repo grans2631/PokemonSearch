@@ -49,7 +49,7 @@ Active eBay listings are intentionally not represented as sold comps.
 
 ## Requirements
 
-- PowerShell 7.2+
+- Windows PowerShell 5.1 or PowerShell 7.2+
 - Internet access
 - optional Pokemon TCG API key (recommended)
 - optional PriceCharting paid API token
@@ -67,7 +67,7 @@ Import-Module .\src\PokemonSearch\PokemonSearch.psd1 -Force
 For a persistent local install:
 
 ```powershell
-$destination = Join-Path $HOME 'Documents\PowerShell\Modules\PokemonSearch\0.1.0'
+$destination = Join-Path $HOME 'Documents\WindowsPowerShell\Modules\PokemonSearch\0.1.1'
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
 Copy-Item .\src\PokemonSearch\* $destination -Recurse -Force
 Import-Module PokemonSearch -Force
@@ -203,7 +203,7 @@ Find what is missing from a set:
 
 ```powershell
 Get-PokemonSetChecklist -SetId '<set-id>' -MissingOnly -IncludePrices |
-    Sort-Object {[double]($_.Market ?? 0)} -Descending
+    Sort-Object @{ Expression = { if ($null -ne $_.Market) { [double]$_.Market } else { 0 } }; Descending = $true }
 ```
 
 See [Collection and set tracking](docs/Collection.md).
@@ -224,7 +224,7 @@ Run tests with Pester 5:
 Invoke-Pester -Path .\tests
 ```
 
-GitHub Actions runs the test suite on Windows for pushes and pull requests.
+GitHub Actions runs the test suite on Windows and includes a Windows PowerShell 5.1 module-import smoke test.
 
 ## Disclaimer
 
