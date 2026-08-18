@@ -1,0 +1,24 @@
+# Secrets / local configuration
+config.json
+.env
+*.secrets.json
+
+# Collection and generated data
+data/collection.json
+data/cache/*.json
+data/price-history/*.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# PowerShell
+*.clixml
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
