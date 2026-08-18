@@ -28,7 +28,8 @@ function Invoke-PokemonSearchRestMethod {
         [string]$ContentType = 'application/json',
         [int]$CacheMinutes = 0,
         [switch]$BypassCache,
-        [string]$CacheIdentity
+        [string]$CacheIdentity,
+        [ValidateRange(1,5)][int]$MaxAttempts = 3
     )
 
     $canCache = $Method -eq 'GET' -and $CacheMinutes -gt 0 -and -not $BypassCache
@@ -53,13 +54,37 @@ function Invoke-PokemonSearchRestMethod {
     if ($null -ne $Body) { $params.Body = $Body }
     if ($ContentType) { $params.ContentType = $ContentType }
 
-    try {
-        $response = Invoke-RestMethod @params
+    $response = $null
+    $lastError = $null
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            $response = Invoke-RestMethod @params
+            $lastError = $null
+            break
+        }
+        catch {
+            $lastError = $_
+            $statusCode = $null
+            try {
+                if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+                    $statusCode = [int]$_.Exception.Response.StatusCode
+                }
+            }
+            catch { }
+
+            $isTransient = $statusCode -in @(408,429,500,502,503,504)
+            if (-not $isTransient -or $attempt -ge $MaxAttempts) {
+                break
+            }
+
+            Start-Sleep -Seconds ([int][math]::Pow(2, $attempt - 1))
+        }
     }
-    catch {
-        $detail = $_.ErrorDetails.Message
-        if (-not $detail) { $detail = $_.Exception.Message }
-        throw "Request failed: $Method $Uri`n$detail"
+
+    if ($lastError) {
+        $detail = $lastError.ErrorDetails.Message
+        if (-not $detail) { $detail = $lastError.Exception.Message }
+        throw "Request failed after $MaxAttempts attempt(s): $Method $Uri`n$detail"
     }
 
     if ($canCache -and $cacheFile) {
