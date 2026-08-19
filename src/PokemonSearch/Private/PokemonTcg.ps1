@@ -18,15 +18,33 @@ function Invoke-PokemonTcgRequest {
     Invoke-PokemonSearchRestMethod -Uri $uri -Headers $headers -CacheMinutes $settings.CacheMinutes -BypassCache:$BypassCache
 }
 
+function Normalize-PokemonCardNumber {
+    param([string]$Number)
+
+    if ([string]::IsNullOrWhiteSpace($Number)) { return $null }
+
+    $normalized = $Number.Trim()
+    $normalized = $normalized -replace '^#\s*', ''
+
+    # Printed collector numbers are commonly shown as 233/091. The API's
+    # card.number value is the numerator only, so search on 233.
+    if ($normalized -match '/') {
+        $normalized = ($normalized -split '/', 2)[0].Trim()
+    }
+
+    $normalized
+}
+
 function New-PokemonTcgSearchQuery {
     param([string]$Name,[string]$SetName,[string]$SetId,[string]$Number,[string]$Rarity)
 
+    $normalizedNumber = Normalize-PokemonCardNumber -Number $Number
     $clauses = New-Object 'System.Collections.Generic.List[string]'
     foreach ($pair in @(
         @{ Field='name'; Value=$Name },
         @{ Field='set.name'; Value=$SetName },
         @{ Field='set.id'; Value=$SetId },
-        @{ Field='number'; Value=$Number },
+        @{ Field='number'; Value=$normalizedNumber },
         @{ Field='rarity'; Value=$Rarity }
     )) {
         if (-not $pair.Value) { continue }
@@ -35,8 +53,7 @@ function New-PokemonTcgSearchQuery {
 
         # The Pokemon TCG API documentation uses unquoted values for
         # single tokens (name:Pikachu) and quotes for phrases
-        # (name:"Mewtwo ex"). Following that form also avoids some
-        # legacy API 500 responses observed with quoted single tokens.
+        # (name:"Mewtwo ex").
         if ($safe -match '\s') {
             $clauses.Add(('{0}:"{1}"' -f $pair.Field, $safe))
         }
