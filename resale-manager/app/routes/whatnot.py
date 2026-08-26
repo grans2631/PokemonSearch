@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -24,6 +24,7 @@ from app.services.whatnot import (
     set_show_status,
     update_show_item,
 )
+from app.services.whatnot_reconcile import import_show_report
 
 
 router = APIRouter(prefix="/whatnot", tags=["whatnot"])
@@ -97,6 +98,13 @@ def show_detail(show_id: int, request: Request, db: Session = Depends(get_db)):
             "show": show,
             "queued": queued,
             "error": request.query_params.get("error"),
+            "reconciled": request.query_params.get("reconciled"),
+            "duplicate": request.query_params.get("duplicate"),
+            "sold_units": request.query_params.get("sold_units"),
+            "unsold_items": request.query_params.get("unsold_items"),
+            "gross": request.query_params.get("gross"),
+            "fees": request.query_params.get("fees"),
+            "profit": request.query_params.get("profit"),
         },
     )
 
@@ -222,6 +230,35 @@ def show_export(show_id: int, db: Session = Depends(get_db)):
             media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+    except ValueError as exc:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/whatnot/shows/{show_id}?error={quote(str(exc))}",
+            status_code=303,
+        )
+
+
+@router.post("/shows/{show_id}/reconcile")
+async def show_reconcile(
+    show_id: int,
+    report: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    filename = report.filename or "whatnot-show-report.csv"
+    try:
+        content = await report.read()
+        summary = import_show_report(db, show_id=show_id, filename=filename, content=content)
+        db.commit()
+        params = {
+            "reconciled": "1",
+            "duplicate": "1" if summary.duplicate else "0",
+            "sold_units": str(summary.sold_units),
+            "unsold_items": str(summary.unsold_items),
+            "gross": f"{summary.gross_cents / 100:.2f}",
+            "fees": f"{summary.fee_cents / 100:.2f}",
+            "profit": f"{summary.realized_profit_cents / 100:.2f}",
+        }
+        return RedirectResponse(url=f"/whatnot/shows/{show_id}?{urlencode(params)}", status_code=303)
     except ValueError as exc:
         db.rollback()
         return RedirectResponse(
