@@ -1,17 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - Pokemon Resale Manager{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
-<p class="muted">v0.1 foundation: inventory, acquisition lineage, and marketplace-ready data model.</p>
-<div class="cards">
-  <section class="metric"><strong>{{ inventory_count }}</strong><span>Inventory records</span></section>
-  <section class="metric"><strong>{{ available_count }}</strong><span>On-hand records</span></section>
-  <section class="metric"><strong>{{ purchase_count }}</strong><span>Purchases</span></section>
-  <section class="metric"><strong>{{ sale_count }}</strong><span>Sales</span></section>
-</div>
-<section class="panel">
-  <h2>Operating flow</h2>
-  <pre>PURCHASE → READY → WHATNOT_QUEUE → SOLD
-                         └→ UNSOLD → EBAY_QUEUE → EBAY_LISTED → SOLD</pre>
-</section>
+<h1>Dashboard</h1><p class="muted">Acquisition → Whatnot first pass → eBay long-tail workflow.</p>
+<div class="cards"><div class="metric"><strong>{{ inventory_count }}</strong><span>Inventory records</span></div><div class="metric"><strong>{{ available_count }}</strong><span>In stock</span></div><div class="metric"><strong>{{ purchase_count }}</strong><span>Purchases</span></div><div class="metric"><strong>{{ sale_count }}</strong><span>Sales</span></div><div class="metric"><strong>{{ whatnot_queue }}</strong><span>Whatnot queue</span></div><div class="metric"><strong>{{ ebay_queue }}</strong><span>eBay queue</span></div></div>
+<div class="panel"><h2>Start intake</h2><p>Record a new lot, collection, or card purchase and immediately allocate cards to your sales workflow.</p><a class="button" href="/purchases/new">New Purchase</a></div>
 {% endblock %}

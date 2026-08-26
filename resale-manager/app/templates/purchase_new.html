@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}New Purchase - Pokemon Resale Manager{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>New Purchase</h1><p class="muted">Record the complete acquisition cost before adding individual cards.</p></div></div>
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+<form class="panel form-grid" method="post" action="/purchases/new">
+  <label>Purchase date<input type="date" name="purchase_date" value="{{ today }}" required></label>
+  <label>Source type<select name="source_type" required><option>WHATNOT</option><option>EBAY</option><option>STORE</option><option>LOCAL</option><option>TRADE</option><option>OTHER</option></select></label>
+  <label>Seller / source name<input name="source_name" placeholder="Seller, store, show, etc."></label>
+  <label>External order ID<input name="external_order_id" placeholder="Optional"></label>
+  <label>Item subtotal ($)<input name="subtotal" inputmode="decimal" value="0.00" required></label>
+  <label>Sales tax ($)<input name="sales_tax" inputmode="decimal" value="0.00"></label>
+  <label>Inbound shipping ($)<input name="shipping" inputmode="decimal" value="0.00"></label>
+  <label>Buyer fees ($)<input name="buyer_fees" inputmode="decimal" value="0.00"></label>
+  <label>Discount ($)<input name="discount" inputmode="decimal" value="0.00"></label>
+  <label class="span-2">Notes<textarea name="notes" rows="3"></textarea></label>
+  <div class="span-2 actions"><button class="button" type="submit">Create Purchase & Add Cards</button><a class="button secondary" href="/purchases">Cancel</a></div>
+</form>
+{% endblock %}

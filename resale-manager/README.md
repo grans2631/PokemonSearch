@@ -1,6 +1,6 @@
 # Pokemon Resale Manager
 
-**Version:** v0.1.0 foundation
+**Version:** v0.2.0 intake workflow
 
 Pokemon Resale Manager is a small, self-hosted inventory and resale workflow application designed around a simple operating model:
 
@@ -12,22 +12,27 @@ Pokemon Resale Manager is a small, self-hosted inventory and resale workflow app
 
 The application is intentionally designed to avoid requiring Shopify, Vendoo, or another paid inventory hub.
 
-## v0.1 scope
+## v0.2 scope
 
-This repository contains the technical foundation rather than the complete marketplace automation layer.
+v0.2 turns the v0.1 schema foundation into a usable acquisition and intake application.
 
-- FastAPI application
-- SQLAlchemy 2 ORM models
-- SQLite database configuration with foreign-key enforcement
-- Alembic migrations
-- 18-table business schema
-- Inventory lifecycle/status model
-- Deterministic SKU generator
-- Minimal dashboard, inventory, and purchases pages
-- JSON health/inventory endpoints
-- Seed/demo data command
-- Basic tests
-- Stubs for future eBay and Whatnot services
+- Create purchases with subtotal, tax, inbound shipping, buyer fees, discounts, source, and notes
+- Server-side landed-cost calculation using integer cents
+- Automatic purchase numbers (`P000001`, `P000002`, ...)
+- Create or reuse local card/set catalog records during intake
+- Create storage locations and assign inventory to them
+- Add serialized singles or quantity/bulk inventory
+- Generate unique immutable SKUs automatically
+- Track condition, finish, language, grading, cert number, market value, target price, and minimum price
+- Allocate purchase landed cost across inventory and prevent accidental over-allocation
+- Automatically maintain `UNALLOCATED`, `PARTIAL`, and `COMPLETE` purchase allocation states
+- Route new inventory directly to `READY`, `WHATNOT_QUEUE`, or `EBAY_QUEUE`
+- Move inventory between manual workflow queues with an audit event
+- Search the local card catalog through `/api/v1/cards/search`
+- Dashboard queue counts and inventory filtering
+- 13 automated tests plus an end-to-end fresh-database smoke test
+
+The eBay and Whatnot marketplace integrations remain intentionally separated behind service boundaries for later milestones.
 
 ## Core workflow
 
@@ -57,7 +62,7 @@ WHATNOT SHOW        EBAY_LISTED
 - SQLite
 - Jinja2 / simple server-rendered HTML
 
-SQLite is deliberate for v0.1. The SQLAlchemy/Alembic layer keeps a future PostgreSQL move practical without redesigning the application.
+SQLite remains deliberate for the early releases. The SQLAlchemy/Alembic layer keeps a future PostgreSQL move practical without redesigning the application.
 
 ## Setup
 
@@ -74,46 +79,17 @@ python -m app.seed
 uvicorn app.main:app --reload
 ```
 
-Open:
-
-```text
-http://127.0.0.1:8000
-```
-
-API documentation:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-### Linux/macOS
-
-```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-cp .env.example .env
-alembic upgrade head
-python -m app.seed
-uvicorn app.main:app --reload
-```
+Open `http://127.0.0.1:8000`. API documentation is at `http://127.0.0.1:8000/docs`.
 
 ## Database
 
-By default, the SQLite database is created at:
-
-```text
-data/pokemon_resale_manager.db
-```
+By default, the SQLite database is created at `data/pokemon_resale_manager.db`.
 
 Schema documentation is in [`docs/schema.md`](docs/schema.md).
 
 ## SKU rules
 
 SKUs identify the inventory we own and are immutable after creation.
-
-Examples:
 
 ```text
 POR-121-SIR-001
@@ -130,18 +106,11 @@ See [`docs/architecture.md`](docs/architecture.md) for the design rules.
 pytest
 ```
 
-## What v0.2 should add
+## Next milestone
 
-Recommended next milestone:
+Recommended v0.3 focus: **Whatnot Show Builder**. Inventory already queued as `WHATNOT_QUEUE` should be selectable into shows, ordered, assigned auction starts, and exported to Whatnot-compatible CSV without re-entering card data.
 
-- Purchase intake forms
-- Card/set catalog administration
-- Inventory add/edit workflow
-- Cost allocation for purchased lots
-- Whatnot show builder
-- Whatnot CSV export/import mapping
-- eBay OAuth setup
-- eBay Inventory API listing queue
+Later milestones can add Whatnot show-result reconciliation and then eBay OAuth/listing automation.
 
 ## Security
 

@@ -1,21 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Purchases - Pokemon Resale Manager{% endblock %}
 {% block content %}
-<h1>Purchases</h1>
+<div class="page-head"><div><h1>Purchases</h1><p class="muted">Create an acquisition, then allocate its landed cost across the cards you received.</p></div><a class="button" href="/purchases/new">New Purchase</a></div>
 <div class="table-wrap">
 <table>
-<thead><tr><th>Purchase</th><th>Date</th><th>Source</th><th>Landed Cost</th><th>Allocation</th></tr></thead>
+<thead><tr><th>Purchase</th><th>Date</th><th>Source</th><th>Landed Cost</th><th>Allocated</th><th>Remaining</th><th>Allocation</th></tr></thead>
 <tbody>
 {% for purchase in purchases %}
 <tr>
-  <td class="mono">{{ purchase.purchase_number }}</td>
+  <td><a class="mono" href="/purchases/{{ purchase.purchase_id }}">{{ purchase.purchase_number }}</a></td>
   <td>{{ purchase.purchase_date }}</td>
   <td>{{ purchase.source_type }}{% if purchase.source_name %} · {{ purchase.source_name }}{% endif %}</td>
   <td>${{ '%.2f'|format(purchase.landed_cost_cents / 100) }}</td>
+  <td>${{ '%.2f'|format(allocation[purchase.purchase_id] / 100) }}</td>
+  <td>${{ '%.2f'|format((purchase.landed_cost_cents - allocation[purchase.purchase_id]) / 100) }}</td>
   <td><span class="pill">{{ purchase.allocation_status }}</span></td>
 </tr>
 {% else %}
-<tr><td colspan="5" class="muted">No purchases yet.</td></tr>
+<tr><td colspan="7" class="muted">No purchases yet. Create your first acquisition.</td></tr>
 {% endfor %}
 </tbody>
 </table>

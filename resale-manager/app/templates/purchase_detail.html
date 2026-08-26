@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ purchase.purchase_number }} - Pokemon Resale Manager{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ purchase.purchase_number }}</h1><p class="muted">{{ purchase.purchase_date }} · {{ purchase.source_type }}{% if purchase.source_name %} · {{ purchase.source_name }}{% endif %}</p></div><a class="button secondary" href="/purchases">All Purchases</a></div>
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+<div class="cards">
+  <div class="metric"><strong>${{ '%.2f'|format(purchase.landed_cost_cents/100) }}</strong><span>Landed cost</span></div>
+  <div class="metric"><strong>${{ '%.2f'|format(allocated/100) }}</strong><span>Allocated</span></div>
+  <div class="metric"><strong>${{ '%.2f'|format(remaining/100) }}</strong><span>Remaining</span></div>
+  <div class="metric"><strong>{{ purchase.allocation_status }}</strong><span>Allocation status</span></div>
+</div>
+<section class="panel">
+<h2>Add Inventory</h2>
+<p class="muted">Enter the printed card information and your copy-specific details. Existing set/card records are reused automatically.</p>
+<form class="form-grid" method="post" action="/purchases/{{ purchase.purchase_id }}/inventory">
+  <label>Set code<input name="set_code" placeholder="POR" required></label>
+  <label>Set name<input name="set_name" placeholder="Perfect Order" required></label>
+  <label>Card name<input name="card_name" placeholder="Meowth ex" required></label>
+  <label>Card number<input name="card_number" placeholder="121/088" required></label>
+  <label>Rarity<input name="rarity" placeholder="SIR"></label>
+  <label>Language<select name="language"><option value="EN">English</option><option value="JP">Japanese</option><option value="KR">Korean</option><option value="CN">Chinese</option><option value="FR">French</option><option value="DE">German</option><option value="ES">Spanish</option></select></label>
+  <label>Condition<select name="condition"><option>NM</option><option>LP</option><option>MP</option><option>HP</option><option>DMG</option></select></label>
+  <label>Finish<input name="finish" placeholder="Holo / Reverse / Non-Holo"></label>
+  <label>Variant / stamp<input name="variant_label" placeholder="Optional"></label>
+  <label>Tracking<select name="tracking_mode"><option value="SERIALIZED">Individual card (Qty 1)</option><option value="QUANTITY">Quantity / bulk</option></select></label>
+  <label>Quantity<input type="number" min="1" name="quantity" value="1" required></label>
+  <label>Allocated unit cost ($)<input name="unit_cost" inputmode="decimal" value="0.00" required></label>
+  <label>Market value ($)<input name="market_value" inputmode="decimal" placeholder="Optional"></label>
+  <label>Target sale price ($)<input name="target_price" inputmode="decimal" placeholder="Optional"></label>
+  <label>Minimum sale price ($)<input name="minimum_price" inputmode="decimal" placeholder="Optional"></label>
+  <label>Storage location<select name="location_id"><option value="">Unassigned</option>{% for location in locations %}<option value="{{ location.location_id }}">{{ location.location_code }} — {{ location.name }}</option>{% endfor %}</select></label>
+  <label>Destination<select name="destination_status">{% for status in inventory_statuses %}<option value="{{ status }}">{{ status }}</option>{% endfor %}</select></label>
+  <label>Grading company<input name="grading_company" placeholder="PSA / CGC / BGS"></label>
+  <label>Grade<input name="grade" placeholder="10"></label>
+  <label>Certification #<input name="cert_number" placeholder="Optional"></label>
+  <label class="span-2">Inventory notes<textarea name="notes" rows="2"></textarea></label>
+  <div class="span-2 actions"><button class="button" type="submit">Add Inventory & Generate SKU</button><a class="button secondary" href="/storage">Manage Storage</a></div>
+</form>
+</section>
+<h2>Inventory from this purchase</h2>
+<div class="table-wrap"><table><thead><tr><th>SKU</th><th>Card</th><th>Status</th><th>Qty</th><th>Unit Cost</th><th>Total Allocation</th></tr></thead><tbody>
+{% for item in purchase.inventory_items %}<tr><td class="mono">{{ item.sku }}</td><td>{{ item.card.name if item.card else '—' }}</td><td><span class="pill">{{ item.status }}</span></td><td>{{ item.quantity_received }}</td><td>${{ '%.2f'|format(item.unit_cost_cents/100) }}</td><td>${{ '%.2f'|format(item.unit_cost_cents*item.quantity_received/100) }}</td></tr>{% else %}<tr><td colspan="6" class="muted">No inventory allocated yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}
