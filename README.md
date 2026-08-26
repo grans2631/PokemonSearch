@@ -4,14 +4,22 @@ This repository is evolving from the original **PokemonSearch** PowerShell toolk
 
 The resale application lives under [`resale-manager/`](resale-manager/). The original PowerShell toolkit remains under [`src/PokemonSearch/`](src/PokemonSearch/) and is intentionally preserved while useful catalog, pricing, eBay, and collection functionality is incorporated into the new application.
 
-## Current release: v0.3
+## Current release: v0.4
 
-v0.3 adds the **Whatnot Show Builder** to the v0.2 purchase and inventory-intake workflow.
+v0.4 closes the Whatnot loop by importing the final Show Report and reconciling each show's inventory into sales and the eBay queue.
 
 ```text
 PURCHASE -> INTAKE -> READY
                       |
                       +-> WHATNOT_QUEUE -> SHOW BUILDER -> WHATNOT CSV -> LIVE SHOW
+                                                              |
+                                                           COMPLETED
+                                                              |
+                                                      SHOW REPORT IMPORT
+                                                         /          \
+                                                      SOLD       UNSOLD
+                                                       |             |
+                                                     SALES       EBAY_QUEUE
                       |
                       +-> EBAY_QUEUE
 ```
@@ -23,12 +31,15 @@ Current capabilities include:
 - storage locations
 - serialized and quantity inventory
 - immutable SKU generation
-- cost allocation controls
+- cost-allocation controls
 - Whatnot and eBay workflow queues
 - Whatnot show creation and run ordering
-- auction start and listing-format controls
 - Whatnot-compatible CSV export
-- inventory audit events
+- final Show Report import and SKU reconciliation
+- Whatnot order, fee, sale, and realized-profit capture
+- automatic SOLD and EBAY_QUEUE routing
+- duplicate report protection
+- Sales ledger and inventory audit events
 
 See [`resale-manager/README.md`](resale-manager/README.md) for setup and workflow details.
 
