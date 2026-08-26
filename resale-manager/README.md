@@ -1,6 +1,6 @@
 # Pokemon Resale Manager
 
-**Version:** v0.4.0 Whatnot Reconciliation
+**Version:** v0.5.0 eBay OAuth + Draft Integration
 
 Pokemon Resale Manager is a self-hosted inventory and resale workflow application for Pokemon cards.
 
@@ -10,96 +10,114 @@ Pokemon Resale Manager is a self-hosted inventory and resale workflow applicatio
 PURCHASE -> INTAKE -> READY
                       |
                       +-> WHATNOT_QUEUE -> SHOW BUILDER -> WHATNOT CSV -> LIVE SHOW
-                      |                                      |
-                      |                                      +-> COMPLETED
-                      |                                            |
-                      |                                      SHOW REPORT CSV
                       |                                            |
                       |                                      RECONCILIATION
                       |                                        /       \
                       |                                     SOLD     UNSOLD
                       |                                      |          |
                       |                                   SALES     EBAY_QUEUE
-                      |
-                      +-> EBAY_QUEUE
+                      |                                                |
+                      +------------------------------------------> LOCAL EBAY DRAFT
+                                                                       |
+                                                               EBAY OFFER DRAFT
+                                                                       |
+                                                               NOT PUBLISHED (v0.5)
 ```
 
-## v0.4 capabilities
+## v0.5 capabilities
 
-v0.4 includes the complete v0.2 intake workflow and v0.3 Whatnot Show Builder, then closes the post-show loop.
+v0.5 retains the completed intake, Whatnot Show Builder, reconciliation, and sales-ledger workflows from prior milestones, then adds the first eBay integration layer.
+
+### eBay OAuth
+
+- Sandbox and Production environments are kept separate.
+- OAuth User authorization-code flow with CSRF `state` validation.
+- Requests `sell.account`, `sell.inventory`, and `sell.fulfillment` scopes.
+- Exchanges the authorization code for User access/refresh tokens.
+- Automatically refreshes expired access tokens.
+- Stores OAuth tokens only in the local data directory, never in SQLite or Git.
+- Supports disconnecting/removing the locally stored eBay token.
+- `.env` is now loaded automatically at startup.
+
+### Seller-account readiness
+
+The `/ebay` page retrieves and displays:
+
+- seller-registration / privilege information
+- opted-in seller programs
+- payment business policies
+- fulfillment business policies
+- return business policies
+- Inventory API merchant locations
+
+The user selects the three policy IDs and merchant location to use for Resale Manager listings. Those non-secret identifiers are stored in `app_settings`.
+
+### eBay Queue
+
+The `/ebay/queue` page shows inventory currently in `EBAY_QUEUE` and can:
+
+- build an eBay title from card/set/grade metadata
+- enforce eBay's 80-character title limit
+- use target price or current market value as the draft-price starting point
+- create/update a local `DRAFT` listing row
+- preserve our immutable inventory SKU as the eBay SKU
+- retain the inventory in `EBAY_QUEUE` while it is only a draft
+
+### Trading-card condition mapping
+
+For eBay's trading-card categories, v0.5 maps our inventory into eBay's Graded/Ungraded condition model:
+
+- Ungraded -> `USED_VERY_GOOD` plus Card Condition descriptor
+  - NM -> Near Mint or Better
+  - LP -> Lightly Played
+  - MP -> Moderately Played
+  - HP/DMG -> Heavily Played/Poor
+- Graded -> `LIKE_NEW` plus Professional Grader + Grade descriptors and certification number when present
+
+Common grader IDs such as PSA, BGS, CGC, SGC, TAG, ACE and others are supported.
+
+### Safe eBay draft synchronization
+
+When **Sync Draft to eBay** is selected, v0.5:
+
+1. validates inventory quantity, seller-policy defaults, category, merchant location, trading-card condition mapping, and actual-card image URLs;
+2. calls eBay `createOrReplaceInventoryItem` using our SKU;
+3. creates or updates an eBay Inventory API Offer;
+4. stores the returned `offerId` in the local `listings` table;
+5. records an inventory audit event;
+6. leaves the local listing in `PENDING` state.
+
+**v0.5 intentionally never calls `publishOffer`. It cannot make the offer live.**
+
+At least one actual inventory photo with an external HTTPS URL is required before eBay synchronization. v0.5 intentionally does not substitute a catalog/reference image for the physical card.
+
+See [`docs/ebay.md`](docs/ebay.md) for the full Sandbox/RuName setup process.
+
+## Previous completed workflows
 
 ### Purchase and inventory intake
 
-- Create purchases and calculate landed cost.
-- Create/reuse card-set and card catalog records.
-- Assign storage locations and immutable SKUs.
-- Track condition, variant, grading, quantities, cost basis, market value, target price, and minimum price.
-- Route inventory to READY, WHATNOT_QUEUE, EBAY_QUEUE, HOLD, or PERSONAL.
+- Purchase/landed-cost tracking
+- Card/set catalog reuse
+- Storage locations
+- Serialized or quantity inventory
+- Immutable SKU generation
+- Cost-basis allocation controls
+- READY / WHATNOT_QUEUE / EBAY_QUEUE routing
 
-### Whatnot Show Builder
+### Whatnot
 
-- Create sequential Whatnot shows.
-- Add inventory from WHATNOT_QUEUE.
-- Set run order, quantities, start prices, sale format, and title overrides.
-- Export a current Whatnot-compatible show CSV using existing inventory data.
-
-### Whatnot Show Report reconciliation
-
-- Require the show to be marked `COMPLETED` before final reconciliation.
-- Upload the final Whatnot Show Report CSV from the show page.
-- Match sold rows to the exact inventory SKU exported by Resale Manager.
-- Fall back to finding the known SKU inside report row content such as the exported description.
-- Recognize multiple reasonable header aliases instead of depending on one fragile Whatnot report header name.
-- Hard-stop the entire reconciliation if a sold row cannot be matched to the show's inventory.
-- Create Whatnot `orders` and `sales` records.
-- Capture sale price, quantity, Whatnot commission, payment-processing fees, and seller-paid shipping when present.
-- Snapshot cost basis into the sale record so later inventory edits do not rewrite historical profit.
-- Reduce quantity on hand and record inventory audit events.
-- Mark fully sold inventory `SOLD`.
-- Move unsold or partially remaining inventory to `EBAY_QUEUE`.
-- Mark show items SOLD/UNSOLD and move the show to `RECONCILED`.
-- SHA-256 fingerprint every imported report and prevent an identical file from creating duplicate sales.
-- Block a different second report after final reconciliation in v0.4 to avoid accidentally changing inventory after it may have entered the eBay workflow.
+- Whatnot Show Builder
+- Run-order/start-price controls
+- Whatnot CSV export
+- Show Report reconciliation
+- Sold/unsold inventory routing
+- Fee, cost-basis, and realized-profit capture
+- Duplicate-file protection
 
 ### Sales ledger
 
-The `/sales` page shows:
-
-- Sale date
-- Marketplace
-- Whatnot show
-- External order ID
-- SKU and card
-- Quantity
-- Gross sale
-- Cost basis
-- Marketplace/processing/shipping costs
-- Realized profit
-
-It also provides aggregate gross sales, cost basis, fees, and realized profit.
-
-## Whatnot report behavior
-
-Whatnot currently documents its Show Report as containing item details, sale prices, fees, and totals. The exact report column names are intentionally handled through aliases in `app/services/whatnot_reconcile.py` so minor marketplace header changes do not require a database change.
-
-The importer currently recognizes common variants of fields including:
-
-```text
-SKU
-Order ID
-Buyer
-Quantity
-Sale Price
-Commission Fee
-Payment Processing Fee
-Total Fees
-Seller Paid Shipping
-Sold At
-Order Status
-Product Description
-```
-
-If a future Whatnot report uses different headings, only the reconciliation adapter should need adjustment.
+The `/sales` page provides sale-level and aggregate gross sales, cost basis, fees/shipping, and realized profit.
 
 ## Technology
 
@@ -109,6 +127,8 @@ If a future Whatnot report uses different headings, only the reconciliation adap
 - Alembic
 - SQLite
 - Jinja2
+- httpx
+- python-dotenv
 
 ## Setup
 
@@ -139,4 +159,4 @@ GitHub Actions validates both the Resale Manager application and the preserved P
 
 ## Next milestone
 
-v0.5 should focus on eBay OAuth and the eBay listing queue: turn inventory in `EBAY_QUEUE` into controlled eBay drafts/listings while retaining our database as the source of truth.
+Before enabling live eBay publication, the next milestone should harden the listing side: image upload/hosting, category/aspect metadata validation, explicit listing preview/approval, Sandbox publish/withdraw testing, and then controlled `publishOffer` support.
