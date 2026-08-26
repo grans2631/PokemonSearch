@@ -4,24 +4,26 @@ This repository is evolving from the original **PokemonSearch** PowerShell toolk
 
 The resale application lives under [`resale-manager/`](resale-manager/). The original PowerShell toolkit remains under [`src/PokemonSearch/`](src/PokemonSearch/) and is intentionally preserved while useful catalog, pricing, eBay, and collection functionality is incorporated into the new application.
 
-## Current release: v0.4
+## Current release: v0.5
 
-v0.4 closes the Whatnot loop by importing the final Show Report and reconciling each show's inventory into sales and the eBay queue.
+v0.5 adds the first controlled eBay integration layer to the completed intake and Whatnot-first workflow.
 
 ```text
 PURCHASE -> INTAKE -> READY
                       |
-                      +-> WHATNOT_QUEUE -> SHOW BUILDER -> WHATNOT CSV -> LIVE SHOW
-                                                              |
-                                                           COMPLETED
-                                                              |
-                                                      SHOW REPORT IMPORT
-                                                         /          \
-                                                      SOLD       UNSOLD
-                                                       |             |
-                                                     SALES       EBAY_QUEUE
-                      |
-                      +-> EBAY_QUEUE
+                      +-> WHATNOT_QUEUE -> SHOW BUILDER -> LIVE SHOW
+                                                       |
+                                                SHOW REPORT IMPORT
+                                                   /          \
+                                                SOLD       UNSOLD
+                                                 |             |
+                                               SALES       EBAY_QUEUE
+                                                               |
+                                                       LOCAL EBAY DRAFT
+                                                               |
+                                                       EBAY OFFER DRAFT
+                                                               |
+                                                       NOT PUBLISHED
 ```
 
 Current capabilities include:
@@ -32,16 +34,21 @@ Current capabilities include:
 - serialized and quantity inventory
 - immutable SKU generation
 - cost-allocation controls
-- Whatnot and eBay workflow queues
-- Whatnot show creation and run ordering
-- Whatnot-compatible CSV export
-- final Show Report import and SKU reconciliation
+- Whatnot show creation and CSV export
+- final Show Report reconciliation
 - Whatnot order, fee, sale, and realized-profit capture
 - automatic SOLD and EBAY_QUEUE routing
-- duplicate report protection
 - Sales ledger and inventory audit events
+- eBay Sandbox/Production OAuth User authorization
+- eBay seller privilege, business-policy, and inventory-location retrieval
+- controlled local eBay drafts from `EBAY_QUEUE`
+- trading-card graded/ungraded condition mapping
+- Inventory API item + Offer draft synchronization
+- OAuth refresh-token handling and local secret storage
 
-See [`resale-manager/README.md`](resale-manager/README.md) for setup and workflow details.
+**v0.5 does not publish eBay offers.** The eBay integration intentionally stops after creating/updating the Inventory API Offer draft so the first Sandbox tests cannot accidentally make inventory live.
+
+See [`resale-manager/README.md`](resale-manager/README.md) for application setup and [`resale-manager/docs/ebay.md`](resale-manager/docs/ebay.md) for eBay Sandbox/OAuth setup.
 
 ## Existing PokemonSearch toolkit
 
