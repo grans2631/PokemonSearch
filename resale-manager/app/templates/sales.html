@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Sales - Pokemon Resale Manager{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div><h1>Sales</h1><p>Realized sales imported from Whatnot and, later, eBay.</p></div>
+</section>
+
+<section class="cards">
+  <div class="card"><h3>Gross Sales</h3><p>${{ '%.2f'|format(gross_cents/100) }}</p></div>
+  <div class="card"><h3>Cost Basis</h3><p>${{ '%.2f'|format(cost_basis_cents/100) }}</p></div>
+  <div class="card"><h3>Fees / Shipping</h3><p>${{ '%.2f'|format(fee_cents/100) }}</p></div>
+  <div class="card"><h3>Realized Profit</h3><p>${{ '%.2f'|format(profit_cents/100) }}</p></div>
+</section>
+
+<section>
+  {% if sales %}
+  <table>
+    <thead><tr><th>Date</th><th>Channel</th><th>Show</th><th>Order</th><th>SKU</th><th>Card</th><th>Qty</th><th>Gross</th><th>Cost</th><th>Fees</th><th>Profit</th></tr></thead>
+    <tbody>
+    {% for sale in sales %}
+      {% set total_fees = sale.marketplace_fee_cents + sale.processing_fee_cents + sale.shipping_cost_allocated_cents + sale.packaging_cost_allocated_cents + sale.discount_cents + sale.refund_cents + sale.other_cost_cents %}
+      <tr>
+        <td>{{ sale.sold_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ sale.marketplace }}</td>
+        <td>{% if sale.show_item and sale.show_item.show %}{{ sale.show_item.show.show_number }}{% else %}—{% endif %}</td>
+        <td>{{ sale.order.external_order_id if sale.order else "—" }}</td>
+        <td>{{ sale.inventory_item.sku }}</td>
+        <td>{% if sale.inventory_item.card %}{{ sale.inventory_item.card.name }} {{ sale.inventory_item.card.card_number }}{% else %}—{% endif %}</td>
+        <td>{{ sale.quantity }}</td>
+        <td>${{ '%.2f'|format(sale.gross_item_cents/100) }}</td>
+        <td>${{ '%.2f'|format(sale.cost_basis_cents/100) }}</td>
+        <td>${{ '%.2f'|format(total_fees/100) }}</td>
+        <td>${{ '%.2f'|format(sale.realized_profit_cents/100) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No sales have been recorded yet. Completed Whatnot shows will populate this ledger after Show Report reconciliation.</p>
+  {% endif %}
+</section>
+{% endblock %}
