@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}eBay Queue - Pokemon Resale Manager{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <h1>eBay Queue</h1>
+    <p>Inventory that has finished the Whatnot-first workflow and is ready for fixed-price eBay preparation.</p>
+  </div>
+  <div><a class="button" href="/ebay">eBay Settings</a></div>
+</section>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if message %}<div class="success">{{ message }}</div>{% endif %}
+
+{% if not connection.connected %}
+<div class="error">eBay is not connected. You can still create local drafts, but syncing them to eBay requires OAuth connection.</div>
+{% endif %}
+
+{% if items %}
+<table>
+  <thead>
+    <tr><th>SKU</th><th>Card</th><th>Qty</th><th>Images</th><th>Price</th><th>Category</th><th>Draft / Offer</th><th>Action</th></tr>
+  </thead>
+  <tbody>
+  {% for item in items %}
+    {% set draft = listings.get(item.inventory_id) %}
+    {% set preview = previews[item.inventory_id] %}
+    <tr>
+      <td>{{ item.sku }}</td>
+      <td>
+        {% if item.card %}
+          {{ item.card.name }} {{ item.card.card_number }}<br>
+          <small>{{ item.card.card_set.name if item.card.card_set else "" }} · {{ item.condition or "—" }}{% if item.is_graded %} · {{ item.grading_company }} {{ item.grade }}{% endif %}</small>
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ item.quantity_on_hand }}</td>
+      <td>{{ preview.image_count }} HTTPS</td>
+      {% if not draft %}
+      <td colspan="3">
+        <form id="draft-{{ item.inventory_id }}" method="post" action="/ebay/queue/{{ item.inventory_id }}/draft"></form>
+        <label>Title <input form="draft-{{ item.inventory_id }}" name="title" value="{{ preview.title }}" maxlength="80" style="min-width:25rem"></label><br>
+        <label>Price <input form="draft-{{ item.inventory_id }}" name="price" value="{{ '%.2f'|format(preview.price_cents/100) }}" style="width:7rem"></label>
+        <label>Category <input form="draft-{{ item.inventory_id }}" name="category_id" value="{{ selected.category_id }}" style="width:8rem"></label>
+      </td>
+      <td><button form="draft-{{ item.inventory_id }}" type="submit">Create Local Draft</button></td>
+      {% else %}
+      <td>${{ '%.2f'|format(draft.price_cents/100) }}</td>
+      <td>{{ selected.category_id }}</td>
+      <td>
+        Local #{{ draft.listing_id }} · {{ draft.status }}
+        {% if draft.external_offer_id %}<br>eBay offer {{ draft.external_offer_id }}{% endif %}
+        {% if draft.last_error %}<br><small>{{ draft.last_error }}</small>{% endif %}
+      </td>
+      <td>
+        {% if draft.status != "ACTIVE" %}
+        <form method="post" action="/ebay/listings/{{ draft.listing_id }}/sync">
+          <button type="submit">Sync Draft to eBay</button>
+        </form>
+        <small>Does not publish</small>
+        {% else %}Active{% endif %}
+      </td>
+      {% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No inventory is currently in <code>EBAY_QUEUE</code>.</p>
+{% endif %}
+
+<section>
+  <h2>Before a draft can sync</h2>
+  <p>The item needs at least one actual-card image with an HTTPS URL, the three selected eBay business policies, an eBay inventory location, a category ID, and a supported trading-card condition mapping.</p>
+</section>
+{% endblock %}
