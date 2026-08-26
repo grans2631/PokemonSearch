@@ -117,3 +117,31 @@ def test_show_must_be_completed(db):
     report = b"SKU,Sale Price\nPOR-121-SIR-001,20.00\n"
     with pytest.raises(ValueError, match="COMPLETED"):
         import_show_report(db, show_id=show.show_id, filename="report.csv", content=report)
+
+
+def test_summary_total_row_is_ignored(db):
+    show, *_ = build_show(db)
+    report = (
+        b"SKU,Title,Sale Price,Fees\n"
+        b"POR-121-SIR-001,Meowth ex,40.00,4.00\n"
+        b",Grand Total,40.00,4.00\n"
+    )
+    result = import_show_report(db, show_id=show.show_id, filename="report.csv", content=report)
+    assert result.sale_records == 1
+    assert result.ignored_rows == 1
+
+
+def test_multiple_items_can_accumulate_one_order_total(db):
+    show, first, second = build_show(db)
+    report = (
+        b"SKU,Order ID,Sale Price,Quantity\n"
+        b"POR-121-SIR-001,BUNDLE-1,40.00,1\n"
+        b"POR-123-SIR-001,BUNDLE-1,20.00,1\n"
+    )
+    result = import_show_report(db, show_id=show.show_id, filename="report.csv", content=report)
+    db.flush()
+    order = db.scalar(select(Order).where(Order.external_order_id == "BUNDLE-1"))
+    assert result.sale_records == 2
+    assert order.order_total_cents == 6000
+    assert first.status == "SOLD"
+    assert second.status == "SOLD"
