@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Whatnot Shows - Pokemon Resale Manager{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <h1>Whatnot Shows</h1>
+    <p>Build live-show inventory from cards already staged in WHATNOT_QUEUE.</p>
+  </div>
+  <a class="button" href="/whatnot/shows/new">New Show</a>
+</section>
+
+{% if shows %}
+<table>
+  <thead>
+    <tr><th>Show</th><th>Name</th><th>Scheduled</th><th>Status</th><th>Items</th><th>Last Export</th></tr>
+  </thead>
+  <tbody>
+  {% for show in shows %}
+    <tr>
+      <td><a href="/whatnot/shows/{{ show.show_id }}">{{ show.show_number }}</a></td>
+      <td>{{ show.name }}</td>
+      <td>{{ show.scheduled_at.strftime("%Y-%m-%d %H:%M") if show.scheduled_at else "—" }}</td>
+      <td>{{ show.status }}</td>
+      <td>{{ show.items|length }}</td>
+      <td>{{ show.export_generated_at.strftime("%Y-%m-%d %H:%M") if show.export_generated_at else "—" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No Whatnot shows yet. Create the first show and pull inventory from the Whatnot queue.</p>
+{% endif %}
+{% endblock %}
