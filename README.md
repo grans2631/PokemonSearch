@@ -52,7 +52,7 @@ Import-Module .\src\PokemonSearch\PokemonSearch.psd1 -Force
 pcard 'Mewtwo ex'
 ```
 
-Existing examples and documentation remain in `examples/` and `docs/`.
+The original full command/setup reference is preserved at [`docs/PokemonSearch-Legacy.md`](docs/PokemonSearch-Legacy.md). Existing examples and supporting documentation remain in `examples/` and `docs/`.
 
 ## Development strategy
 
