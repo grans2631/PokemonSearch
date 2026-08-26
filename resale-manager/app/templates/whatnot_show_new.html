@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}New Whatnot Show{% endblock %}
+{% block content %}
+<h1>New Whatnot Show</h1>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<form method="post" action="/whatnot/shows/new">
+  <label>Show name
+    <input type="text" name="name" required placeholder="Friday Night Singles">
+  </label>
+  <label>Scheduled date/time
+    <input type="datetime-local" name="scheduled_at">
+  </label>
+  <label>Theme
+    <input type="text" name="theme" placeholder="Perfect Order / fresh pickups">
+  </label>
+  <label>Notes
+    <textarea name="notes" rows="4"></textarea>
+  </label>
+  <button type="submit">Create Show</button>
+</form>
+{% endblock %}
