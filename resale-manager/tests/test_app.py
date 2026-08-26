@@ -8,7 +8,7 @@ def test_health_endpoint():
     response = client.get("/api/v1/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
-    assert response.json()["version"] == "0.3.0"
+    assert response.json()["version"] == "0.4.0"
 
 
 def test_new_purchase_page():
@@ -33,3 +33,9 @@ def test_new_whatnot_show_page():
     response = client.get("/whatnot/shows/new")
     assert response.status_code == 200
     assert "New Whatnot Show" in response.text
+
+
+def test_sales_page():
+    response = client.get("/sales")
+    assert response.status_code == 200
+    assert "Sales" in response.text
