@@ -8,11 +8,20 @@
     {% if show.theme %}<p>{{ show.theme }}</p>{% endif %}
   </div>
   <div>
-    {% if show.items %}<a class="button" href="/whatnot/shows/{{ show.show_id }}/export.csv">Export Whatnot CSV</a>{% endif %}
+    {% if show.items and show.status in ["DRAFT", "READY"] %}<a class="button" href="/whatnot/shows/{{ show.show_id }}/export.csv">Export Whatnot CSV</a>{% endif %}
   </div>
 </section>
 
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if reconciled %}
+<div class="notice">
+  {% if duplicate == "1" %}
+    This exact Show Report was already imported; no duplicate sales were created.
+  {% else %}
+    Reconciliation complete: {{ sold_units }} unit(s) sold, {{ unsold_items }} unsold item(s), gross ${{ gross }}, fees/shipping ${{ fees }}, realized card profit ${{ profit }}.
+  {% endif %}
+</div>
+{% endif %}
 
 <section>
   <h2>Show controls</h2>
@@ -20,13 +29,12 @@
     {% for status in ["DRAFT", "READY", "LIVE", "COMPLETED", "CANCELLED"] %}
     <form method="post" action="/whatnot/shows/{{ show.show_id }}/status" style="display:inline">
       <input type="hidden" name="status" value="{{ status }}">
-      <button type="submit" {% if show.status == status %}disabled{% endif %}>{{ status }}</button>
+      <button type="submit" {% if show.status == status or show.status == "RECONCILED" %}disabled{% endif %}>{{ status }}</button>
     </form>
     {% endfor %}
   </div>
-  {% if show.export_generated_at %}
-    <p>Last CSV export: {{ show.export_generated_at.strftime("%Y-%m-%d %H:%M") }}</p>
-  {% endif %}
+  {% if show.export_generated_at %}<p>Last CSV export: {{ show.export_generated_at.strftime("%Y-%m-%d %H:%M") }}</p>{% endif %}
+  {% if show.results_imported_at %}<p>Show Report imported: {{ show.results_imported_at.strftime("%Y-%m-%d %H:%M") }}</p>{% endif %}
 </section>
 
 <section>
@@ -34,43 +42,55 @@
   {% if show.items %}
   <table>
     <thead>
-      <tr><th>#</th><th>SKU</th><th>Card</th><th>Qty</th><th>Start</th><th>Type</th><th>Title override</th><th>Actions</th></tr>
+      <tr><th>#</th><th>SKU</th><th>Card</th><th>Planned</th><th>Sold</th><th>Result</th><th>Start</th><th>Type</th><th>Title override</th><th>Actions</th></tr>
     </thead>
     <tbody>
     {% for line in show.items|sort(attribute="sequence_number") %}
       <tr>
           <td>
             <form id="update-{{ line.show_item_id }}" method="post" action="/whatnot/shows/{{ show.show_id }}/items/{{ line.show_item_id }}"></form>
-            <input form="update-{{ line.show_item_id }}" name="sequence_number" type="number" min="1" value="{{ line.sequence_number or loop.index }}" style="width:5rem">
+            <input form="update-{{ line.show_item_id }}" name="sequence_number" type="number" min="1" value="{{ line.sequence_number or loop.index }}" style="width:5rem" {% if show.status not in ["DRAFT", "READY"] %}disabled{% endif %}>
           </td>
           <td>{{ line.inventory_item.sku }}</td>
+          <td>{% if line.inventory_item.card %}{{ line.inventory_item.card.name }} {{ line.inventory_item.card.card_number }}{% else %}—{% endif %}</td>
+          <td><input form="update-{{ line.show_item_id }}" name="quantity" type="number" min="1" max="{{ line.inventory_item.quantity_on_hand }}" value="{{ line.quantity_planned }}" style="width:5rem" {% if show.status not in ["DRAFT", "READY"] %}disabled{% endif %}></td>
+          <td>{{ line.quantity_sold }}</td>
+          <td>{{ line.result_status }}</td>
+          <td><input form="update-{{ line.show_item_id }}" name="auction_start" value="{{ '%.2f'|format((line.auction_start_cents or 0)/100) }}" style="width:6rem" {% if show.status not in ["DRAFT", "READY"] %}disabled{% endif %}></td>
           <td>
-            {% if line.inventory_item.card %}
-              {{ line.inventory_item.card.name }} {{ line.inventory_item.card.card_number }}
-            {% else %}—{% endif %}
-          </td>
-          <td><input form="update-{{ line.show_item_id }}" name="quantity" type="number" min="1" max="{{ line.inventory_item.quantity_on_hand }}" value="{{ line.quantity_planned }}" style="width:5rem"></td>
-          <td><input form="update-{{ line.show_item_id }}" name="auction_start" value="{{ '%.2f'|format((line.auction_start_cents or 0)/100) }}" style="width:6rem"></td>
-          <td>
-            <select form="update-{{ line.show_item_id }}" name="sale_format">
+            <select form="update-{{ line.show_item_id }}" name="sale_format" {% if show.status not in ["DRAFT", "READY"] %}disabled{% endif %}>
               <option value="AUCTION" {% if line.sale_format == "AUCTION" %}selected{% endif %}>Auction</option>
               <option value="BUY_IT_NOW" {% if line.sale_format == "BUY_IT_NOW" %}selected{% endif %}>Buy It Now</option>
               <option value="GIVEAWAY" {% if line.sale_format == "GIVEAWAY" %}selected{% endif %}>Giveaway</option>
             </select>
           </td>
-          <td><input form="update-{{ line.show_item_id }}" name="title_override" value="{{ line.title_override or '' }}" placeholder="Optional"></td>
+          <td><input form="update-{{ line.show_item_id }}" name="title_override" value="{{ line.title_override or '' }}" placeholder="Optional" {% if show.status not in ["DRAFT", "READY"] %}disabled{% endif %}></td>
           <td>
-            <button form="update-{{ line.show_item_id }}" type="submit">Save</button>
-            <form method="post" action="/whatnot/shows/{{ show.show_id }}/items/{{ line.show_item_id }}/remove" style="display:inline">
-              <button type="submit">Remove</button>
-            </form>
+            {% if show.status in ["DRAFT", "READY"] %}
+              <button form="update-{{ line.show_item_id }}" type="submit">Save</button>
+              <form method="post" action="/whatnot/shows/{{ show.show_id }}/items/{{ line.show_item_id }}/remove" style="display:inline"><button type="submit">Remove</button></form>
+            {% else %}—{% endif %}
           </td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
+  {% else %}<p>This show has no inventory yet.</p>{% endif %}
+</section>
+
+<section>
+  <h2>Post-show Reconciliation</h2>
+  {% if show.status == "COMPLETED" %}
+    <p>Download the final <strong>Show Report CSV</strong> from Whatnot Seller Hub, then import it here. Sold cards will be recorded as sales; unsold inventory will move automatically to <code>EBAY_QUEUE</code>.</p>
+    <form method="post" action="/whatnot/shows/{{ show.show_id }}/reconcile" enctype="multipart/form-data">
+      <label>Whatnot Show Report CSV <input type="file" name="report" accept=".csv,text/csv" required></label>
+      <button type="submit">Import & Reconcile Show</button>
+    </form>
+    <p><strong>Safety:</strong> the import aborts if a sold row cannot be matched to one of this show's SKUs. Import the final report only.</p>
+  {% elif show.status == "RECONCILED" %}
+    <p>This show is reconciled. Sold inventory is recorded in Sales and remaining inventory has been routed to the eBay queue.</p>
   {% else %}
-  <p>This show has no inventory yet.</p>
+    <p>Mark the show <strong>COMPLETED</strong> after the live show ends to enable final Show Report import.</p>
   {% endif %}
 </section>
 
@@ -79,9 +99,7 @@
   {% if show.status in ["DRAFT", "READY"] %}
     {% if queued %}
     <form method="post" action="/whatnot/shows/{{ show.show_id }}/items">
-      <label>Default auction start
-        <input name="default_start" value="1.00" style="width:7rem">
-      </label>
+      <label>Default auction start <input name="default_start" value="1.00" style="width:7rem"></label>
       <table>
         <thead><tr><th>Add</th><th>SKU</th><th>Card</th><th>Condition</th><th>On Hand</th><th>Market</th><th>Location</th></tr></thead>
         <tbody>
@@ -100,12 +118,8 @@
       </table>
       <button type="submit">Add Selected To Show</button>
     </form>
-    {% else %}
-    <p>No unassigned inventory is currently available in WHATNOT_QUEUE.</p>
-    {% endif %}
-  {% else %}
-    <p>This show is not editable while its status is {{ show.status }}.</p>
-  {% endif %}
+    {% else %}<p>No unassigned inventory is currently available in WHATNOT_QUEUE.</p>{% endif %}
+  {% else %}<p>This show is not editable while its status is {{ show.status }}.</p>{% endif %}
 </section>
 
 <section>
