@@ -172,13 +172,17 @@ def ebay_create_draft(
     service = _service()
     try:
         cents = money_to_cents(price)
+        selected_category = category_id.strip() or service.listing_settings(db)["category_id"]
         listing = service.create_local_draft(
             db,
             inventory=inventory,
             title=title,
             price_cents=cents,
-            category_id=category_id or service.listing_settings(db)["category_id"],
+            category_id=selected_category,
         )
+        # create_local_draft stores this for a new listing. Re-save it here as
+        # well so editing an existing local draft can change its eBay category.
+        service.set_setting(db, f"ebay.listing.{listing.listing_id}.category_id", selected_category)
         db.commit()
         return RedirectResponse(url=f"/ebay/queue?message=Draft%20{listing.listing_id}%20saved", status_code=303)
     except (ValueError, EbayError) as exc:
