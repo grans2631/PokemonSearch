@@ -8,7 +8,7 @@ def test_health_endpoint():
     response = client.get("/api/v1/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
-    assert response.json()["version"] == "0.4.0"
+    assert response.json()["version"] == "0.5.0"
 
 
 def test_new_purchase_page():
@@ -39,3 +39,15 @@ def test_sales_page():
     response = client.get("/sales")
     assert response.status_code == 200
     assert "Sales" in response.text
+
+
+def test_ebay_page():
+    response = client.get("/ebay")
+    assert response.status_code == 200
+    assert "eBay" in response.text
+
+
+def test_ebay_queue_page():
+    response = client.get("/ebay/queue")
+    assert response.status_code == 200
+    assert "eBay Queue" in response.text
