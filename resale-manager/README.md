@@ -1,72 +1,77 @@
 # Pokemon Resale Manager
 
-**Version:** v0.2.0 intake workflow
+**Version:** v0.3.0 Whatnot Show Builder
 
-Pokemon Resale Manager is a small, self-hosted inventory and resale workflow application designed around a simple operating model:
+Pokemon Resale Manager is a self-hosted inventory and resale workflow application for Pokemon cards.
 
-1. Buy singles, lots, or collections.
-2. Intake and assign cost basis to inventory.
-3. Run selected fresh inventory on Whatnot first.
-4. Move unsold Whatnot inventory into an eBay listing queue.
-5. Track sales, fulfillment, fees, and realized profit.
-
-The application is intentionally designed to avoid requiring Shopify, Vendoo, or another paid inventory hub.
-
-## v0.2 scope
-
-v0.2 turns the v0.1 schema foundation into a usable acquisition and intake application.
-
-- Create purchases with subtotal, tax, inbound shipping, buyer fees, discounts, source, and notes
-- Server-side landed-cost calculation using integer cents
-- Automatic purchase numbers (`P000001`, `P000002`, ...)
-- Create or reuse local card/set catalog records during intake
-- Create storage locations and assign inventory to them
-- Add serialized singles or quantity/bulk inventory
-- Generate unique immutable SKUs automatically
-- Track condition, finish, language, grading, cert number, market value, target price, and minimum price
-- Allocate purchase landed cost across inventory and prevent accidental over-allocation
-- Automatically maintain `UNALLOCATED`, `PARTIAL`, and `COMPLETE` purchase allocation states
-- Route new inventory directly to `READY`, `WHATNOT_QUEUE`, or `EBAY_QUEUE`
-- Move inventory between manual workflow queues with an audit event
-- Search the local card catalog through `/api/v1/cards/search`
-- Dashboard queue counts and inventory filtering
-- 13 automated tests plus an end-to-end fresh-database smoke test
-
-The eBay and Whatnot marketplace integrations remain intentionally separated behind service boundaries for later milestones.
-
-## Core workflow
+## Workflow
 
 ```text
-PURCHASE
-   |
-RECEIVED
-   |
-READY
-   |-------------------|
-   |                   |
-WHATNOT_QUEUE       EBAY_QUEUE
-   |                   |
-WHATNOT SHOW        EBAY_LISTED
-   |                   |
-   |-- SOLD             SOLD
-   |
-   `-- UNSOLD --> EBAY_QUEUE
+PURCHASE -> INTAKE -> READY
+                      |
+                      +-> WHATNOT_QUEUE -> SHOW BUILDER -> WHATNOT CSV -> LIVE SHOW
+                      |                                      |
+                      |                                      +-> sold (v0.4 reconciliation)
+                      |                                      +-> unsold -> EBAY_QUEUE
+                      |
+                      +-> EBAY_QUEUE
 ```
+
+## v0.3 capabilities
+
+v0.3 includes the complete v0.2 purchase and intake workflow plus the Whatnot Show Builder.
+
+### Purchase and inventory intake
+
+- Create purchases and calculate landed cost.
+- Generate sequential purchase numbers.
+- Create or reuse card-set and card catalog records.
+- Assign storage locations.
+- Track condition, language, finish, grading, quantities, cost basis, market value, target price, and minimum price.
+- Generate immutable SKUs.
+- Prevent purchase-cost over-allocation.
+- Route inventory to READY, WHATNOT_QUEUE, EBAY_QUEUE, HOLD, or PERSONAL.
+
+### Whatnot Show Builder
+
+- Create sequential show numbers such as `WN000001`.
+- Add cards directly from `WHATNOT_QUEUE`.
+- Prevent one item from being assigned to multiple active Whatnot shows.
+- Set run order, planned quantity, auction start, sale format, and optional title overrides.
+- Remove cards from draft or ready shows.
+- Track show state: DRAFT, READY, LIVE, COMPLETED, or CANCELLED.
+- Record show add/remove activity in inventory audit events.
+- Export the show to a Whatnot CSV without re-entering card data.
+- Include SKU, cost basis, condition, quantity, price, and up to eight HTTPS image URLs.
+- Record the CSV export time and row numbers for later result reconciliation.
+
+The exporter is isolated in `app/services/whatnot.py` so marketplace template changes can be updated without changing the inventory schema.
+
+## Whatnot CSV defaults
+
+The v0.3 exporter follows Whatnot's current US/Australia/Netherlands non-Coins template shape documented in July 2026. Current defaults are:
+
+```text
+Category: Trading Card Games
+Sub Category: Pokémon Cards
+Shipping Profile: 0-1 oz
+Hazmat: Not Hazmat
+```
+
+See `docs/whatnot.md` for the CSV field mapping.
 
 ## Technology
 
 - Python 3.12+
 - FastAPI
-- SQLAlchemy 2.0
+- SQLAlchemy 2
 - Alembic
 - SQLite
-- Jinja2 / simple server-rendered HTML
-
-SQLite remains deliberate for the early releases. The SQLAlchemy/Alembic layer keeps a future PostgreSQL move practical without redesigning the application.
+- Jinja2
 
 ## Setup
 
-### Windows PowerShell
+From the `resale-manager` directory on Windows PowerShell:
 
 ```powershell
 py -3.12 -m venv .venv
@@ -79,39 +84,18 @@ python -m app.seed
 uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000`. API documentation is at `http://127.0.0.1:8000/docs`.
+Open `http://127.0.0.1:8000`.
 
-## Database
+The SQLite database is created by default at `data/pokemon_resale_manager.db`.
 
-By default, the SQLite database is created at `data/pokemon_resale_manager.db`.
+## Tests
 
-Schema documentation is in [`docs/schema.md`](docs/schema.md).
-
-## SKU rules
-
-SKUs identify the inventory we own and are immutable after creation.
-
-```text
-POR-121-SIR-001
-POR-121-SIR-PSA10-001
-POR-JP-121-SIR-001
-POR-042-RH-B001
-```
-
-See [`docs/architecture.md`](docs/architecture.md) for the design rules.
-
-## Running tests
-
-```bash
+```powershell
 pytest
 ```
 
+GitHub Actions also validates the Resale Manager application and the preserved PokemonSearch PowerShell toolkit.
+
 ## Next milestone
 
-Recommended v0.3 focus: **Whatnot Show Builder**. Inventory already queued as `WHATNOT_QUEUE` should be selectable into shows, ordered, assigned auction starts, and exported to Whatnot-compatible CSV without re-entering card data.
-
-Later milestones can add Whatnot show-result reconciliation and then eBay OAuth/listing automation.
-
-## Security
-
-Do not commit marketplace secrets, OAuth tokens, buyer addresses, or production database files. `.env` and local SQLite data are excluded by `.gitignore`.
+v0.4: import a Whatnot Show Report, reconcile sold and unsold show inventory, create sales records, capture fees, move sold inventory to SOLD, and move unsold inventory to EBAY_QUEUE.
