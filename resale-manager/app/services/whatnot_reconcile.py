@@ -23,8 +23,8 @@ _ALIASES = {
     "order_id": {"order id", "order number", "order numeric id", "order"},
     "buyer": {"buyer", "buyer username", "username", "customer"},
     "quantity": {"quantity", "qty", "quantity sold", "units"},
-    "sale_price": {"sale price", "sold price", "item price", "price", "gross item", "gross sale", "gross sales"},
-    "commission_fee": {"commission fee", "whatnot commission", "whatnot commission fee", "marketplace fee", "seller fee"},
+    "sale_price": {"sale price", "sold price", "item price", "price", "gross item", "gross sale", "gross sales", "final sale price", "item sale price", "sale amount"},
+    "commission_fee": {"commission fee", "whatnot commission", "whatnot commission fee", "whatnot fee", "marketplace fee", "seller fee"},
     "processing_fee": {"payment processing fee", "processing fee", "payment fee"},
     "total_fees": {"fees", "total fees", "seller fees", "total seller fees"},
     "seller_shipping": {"seller paid shipping", "shipping cost", "shipping label cost", "seller shipping"},
@@ -182,10 +182,11 @@ def import_show_report(
         raise ValueError("Whatnot Show Report exceeds the 10 MB import limit")
 
     digest = hashlib.sha256(content).hexdigest()
+    operation_name = f"SHOW_REPORT_IMPORT:{show_id}"
     prior = db.scalar(
         select(IntegrationRun).where(
             IntegrationRun.integration == "WHATNOT",
-            IntegrationRun.operation == "SHOW_REPORT_IMPORT",
+            IntegrationRun.operation == operation_name,
             IntegrationRun.file_sha256 == digest,
             IntegrationRun.status == "COMPLETED",
         )
@@ -210,7 +211,7 @@ def import_show_report(
     now = utcnow()
     run = IntegrationRun(
         integration="WHATNOT",
-        operation="SHOW_REPORT_IMPORT",
+        operation=operation_name,
         direction="IMPORT",
         filename=(filename or "whatnot-show-report.csv")[:250],
         file_sha256=digest,
@@ -232,7 +233,13 @@ def import_show_report(
 
         sku = _known_sku_from_row(row, header_map, known)
         if not sku:
-            if looks_sold:
+            row_context = _norm(" ".join(str(value or "") for value in row.values()))
+            has_identity = any(_cell(row, header_map, key) for key in ("order_id", "buyer", "title", "description", "sku"))
+            looks_like_summary = (
+                any(token in row_context for token in ("show total", "grand total", "summary", "totals"))
+                or (not has_identity and looks_sold)
+            )
+            if looks_sold and not looks_like_summary:
                 unmatched_sold_rows.append(row_index)
             else:
                 summary.ignored_rows += 1
@@ -263,22 +270,25 @@ def import_show_report(
         commission = _positive_cost(_cell(row, header_map, "commission_fee"))
         processing = _positive_cost(_cell(row, header_map, "processing_fee"))
         total_fees = _positive_cost(_cell(row, header_map, "total_fees"))
-        if commission == 0 and processing == 0 and total_fees:
-            commission = total_fees
+        known_fees = commission + processing
+        other_fees = max(total_fees - known_fees, 0) if total_fees else 0
+        if known_fees == 0 and total_fees:
+            other_fees = total_fees
         seller_shipping = _positive_cost(_cell(row, header_map, "seller_shipping"))
-        fee_total = commission + processing + seller_shipping
+        fee_total = commission + processing + other_fees + seller_shipping
 
         order = db.scalar(
             select(Order).where(Order.marketplace == "WHATNOT", Order.external_order_id == external_order_id)
         )
-        if order is None:
+        order_is_new = order is None
+        if order_is_new:
             order = Order(
                 marketplace="WHATNOT",
                 external_order_id=external_order_id,
                 buyer_handle=buyer,
                 ordered_at=sold_at,
                 currency="USD",
-                order_total_cents=sale_price_cents * qty,
+                order_total_cents=0,
                 tax_collected_cents=0,
                 shipping_charged_cents=0,
                 status=(_cell(row, header_map, "status") or "COMPLETE")[:30],
@@ -297,6 +307,10 @@ def import_show_report(
             continue
 
         gross = sale_price_cents * qty
+        if order_is_new:
+            order.order_total_cents = gross
+        else:
+            order.order_total_cents += gross
         cost_basis = inventory.unit_cost_cents * qty
         sale = Sale(
             order_id=order.order_id,
@@ -314,7 +328,7 @@ def import_show_report(
             packaging_cost_allocated_cents=0,
             discount_cents=0,
             refund_cents=0,
-            other_cost_cents=0,
+            other_cost_cents=other_fees,
             currency="USD",
             notes=f"Imported from {show.show_number} Show Report",
         )
