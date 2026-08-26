@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.core.config import settings
-from app.routes import api, web
+from app.routes import api, web, whatnot
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -19,4 +19,5 @@ app = FastAPI(
 )
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
 app.include_router(web.router)
+app.include_router(whatnot.router)
 app.include_router(api.router)
