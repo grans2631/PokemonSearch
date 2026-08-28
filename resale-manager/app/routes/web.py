@@ -23,6 +23,7 @@ from app.services.intake import (
     refresh_purchase_allocation,
     transition_inventory,
 )
+from app.services.tcgdex import TCGdexService
 
 router = APIRouter(tags=["web"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
@@ -64,7 +65,34 @@ def inventory_page(request: Request, status: str | None = None, db: Session = De
     if status:
         stmt = stmt.where(InventoryItem.status == status.upper())
     items = db.scalars(stmt).all()
-    return templates.TemplateResponse(request=request, name="inventory.html", context={"items": items, "status_filter": status})
+    total_market_cents = sum((item.market_value_cents or 0) * item.quantity_on_hand for item in items)
+    return templates.TemplateResponse(request=request, name="inventory.html", context={
+        "items": items,
+        "status_filter": status,
+        "total_market_cents": total_market_cents,
+        "pricing_checked": request.query_params.get("pricing_checked"),
+        "pricing_matched": request.query_params.get("pricing_matched"),
+        "pricing_priced": request.query_params.get("pricing_priced"),
+        "pricing_unmatched": request.query_params.get("pricing_unmatched"),
+        "pricing_error": request.query_params.get("pricing_error"),
+    })
+
+
+@router.post("/inventory/pricing/refresh")
+def inventory_refresh_prices(db: Session = Depends(get_db)):
+    try:
+        summary = TCGdexService().refresh_inventory(db)
+        db.commit()
+        return RedirectResponse(
+            url=(
+                "/inventory?pricing_checked={checked}&pricing_matched={matched}"
+                "&pricing_priced={priced}&pricing_unmatched={unmatched}"
+            ).format(**summary),
+            status_code=303,
+        )
+    except Exception as exc:
+        db.rollback()
+        return RedirectResponse(url=f"/inventory?pricing_error={quote(str(exc))}", status_code=303)
 
 
 @router.post("/inventory/{inventory_id}/status")
