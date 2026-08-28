@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -13,7 +13,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.enums import InventoryStatus
 from app.models import Card, InventoryItem, Listing, ListingItem
-from app.services.ebay import EbayError, EbayService
+from app.services.ebay import EbayError
+from app.services.ebay_v06 import EbayV06Service
 from app.services.intake import money_to_cents
 
 
@@ -21,8 +22,8 @@ router = APIRouter(prefix="/ebay", tags=["ebay"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
 
 
-def _service() -> EbayService:
-    return EbayService()
+def _service() -> EbayV06Service:
+    return EbayV06Service()
 
 
 def _redirect_error(path: str, message: str) -> RedirectResponse:
@@ -114,7 +115,10 @@ def ebay_queue(request: Request, db: Session = Depends(get_db)):
     service = _service()
     items = db.scalars(
         select(InventoryItem)
-        .where(InventoryItem.status == InventoryStatus.EBAY_QUEUE.value, InventoryItem.quantity_on_hand > 0)
+        .where(
+            InventoryItem.status.in_([InventoryStatus.EBAY_QUEUE.value, InventoryStatus.EBAY_LISTED.value]),
+            InventoryItem.quantity_on_hand > 0,
+        )
         .options(
             joinedload(InventoryItem.card).joinedload(Card.card_set),
             joinedload(InventoryItem.images),
@@ -139,7 +143,8 @@ def ebay_queue(request: Request, db: Session = Depends(get_db)):
         item.inventory_id: {
             "title": service.build_title(item),
             "price_cents": item.target_price_cents or item.market_value_cents or 0,
-            "image_count": len([image for image in item.images if image.external_url and image.external_url.startswith("https://")]),
+            "local_image_count": len([image for image in item.images if image.local_path]),
+            "ebay_image_count": len([image for image in item.images if image.external_url and image.external_url.startswith("https://")]),
         }
         for item in items
     }
@@ -152,10 +157,47 @@ def ebay_queue(request: Request, db: Session = Depends(get_db)):
             "previews": previews,
             "selected": selected,
             "connection": service.connection_status(),
+            "environment": settings.ebay_environment,
             "error": request.query_params.get("error"),
             "message": request.query_params.get("message"),
         },
     )
+
+
+@router.post("/queue/{inventory_id}/image")
+async def ebay_add_image(
+    inventory_id: int,
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    inventory = db.get(InventoryItem, inventory_id)
+    if inventory is None:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    try:
+        content = await image.read()
+        _service().store_local_image(
+            db,
+            inventory=inventory,
+            filename=image.filename or "image",
+            content_type=image.content_type or "application/octet-stream",
+            content=content,
+        )
+        db.commit()
+        return RedirectResponse(url="/ebay/queue?message=Local%20inventory%20image%20saved", status_code=303)
+    except EbayError as exc:
+        db.rollback()
+        return _redirect_error("/ebay/queue", str(exc))
+
+
+@router.post("/images/{image_id}/upload-ebay")
+def ebay_upload_image(image_id: int, db: Session = Depends(get_db)):
+    try:
+        _service().upload_image_to_ebay(db, image_id=image_id)
+        db.commit()
+        return RedirectResponse(url="/ebay/queue?message=Image%20uploaded%20to%20eBay%20Picture%20Services", status_code=303)
+    except EbayError as exc:
+        db.rollback()
+        return _redirect_error("/ebay/queue", str(exc))
 
 
 @router.post("/queue/{inventory_id}/draft")
@@ -180,9 +222,8 @@ def ebay_create_draft(
             price_cents=cents,
             category_id=selected_category,
         )
-        # create_local_draft stores this for a new listing. Re-save it here as
-        # well so editing an existing local draft can change its eBay category.
         service.set_setting(db, f"ebay.listing.{listing.listing_id}.category_id", selected_category)
+        service.set_approved(db, listing.listing_id, False)
         db.commit()
         return RedirectResponse(url=f"/ebay/queue?message=Draft%20{listing.listing_id}%20saved", status_code=303)
     except (ValueError, EbayError) as exc:
@@ -194,10 +235,11 @@ def ebay_create_draft(
 def ebay_sync_draft(listing_id: int, db: Session = Depends(get_db)):
     service = _service()
     try:
+        service.set_approved(db, listing_id, False)
         result = service.sync_draft_to_ebay(db, listing_id=listing_id)
         db.commit()
         return RedirectResponse(
-            url=f"/ebay/queue?message=eBay%20offer%20draft%20{quote(result.external_offer_id or '')}%20synced%20(not%20published)",
+            url=f"/ebay/listings/{listing_id}/preview?message=eBay%20offer%20draft%20{quote(result.external_offer_id or '')}%20synced",
             status_code=303,
         )
     except EbayError as exc:
@@ -207,3 +249,67 @@ def ebay_sync_draft(listing_id: int, db: Session = Depends(get_db)):
             listing.last_error = str(exc)
             db.commit()
         return _redirect_error("/ebay/queue", str(exc))
+
+
+@router.get("/listings/{listing_id}/preview")
+def ebay_listing_preview(listing_id: int, request: Request, db: Session = Depends(get_db)):
+    service = _service()
+    try:
+        preview = service.listing_preview(db, listing_id=listing_id)
+        suggestions = []
+        if service.connection_status()["connected"]:
+            try:
+                suggestions = service.suggest_categories(preview["title"])[:5]
+            except EbayError:
+                suggestions = []
+        return templates.TemplateResponse(
+            request=request,
+            name="ebay_listing_preview.html",
+            context={
+                **preview,
+                "suggestions": suggestions,
+                "error": request.query_params.get("error"),
+                "message": request.query_params.get("message"),
+            },
+        )
+    except EbayError as exc:
+        return _redirect_error("/ebay/queue", str(exc))
+
+
+@router.post("/listings/{listing_id}/approve")
+def ebay_approve_listing(listing_id: int, db: Session = Depends(get_db)):
+    try:
+        _service().approve_listing(db, listing_id=listing_id)
+        db.commit()
+        return RedirectResponse(url=f"/ebay/listings/{listing_id}/preview?message=Listing%20approved", status_code=303)
+    except EbayError as exc:
+        db.rollback()
+        return _redirect_error(f"/ebay/listings/{listing_id}/preview", str(exc))
+
+
+@router.post("/listings/{listing_id}/publish")
+def ebay_publish_listing(listing_id: int, db: Session = Depends(get_db)):
+    try:
+        external_id = _service().publish_offer_sandbox(db, listing_id=listing_id)
+        db.commit()
+        return RedirectResponse(
+            url=f"/ebay/listings/{listing_id}/preview?message=Sandbox%20listing%20{quote(external_id)}%20published",
+            status_code=303,
+        )
+    except EbayError as exc:
+        db.rollback()
+        return _redirect_error(f"/ebay/listings/{listing_id}/preview", str(exc))
+
+
+@router.post("/listings/{listing_id}/withdraw")
+def ebay_withdraw_listing(listing_id: int, db: Session = Depends(get_db)):
+    try:
+        _service().withdraw_offer_sandbox(db, listing_id=listing_id)
+        db.commit()
+        return RedirectResponse(
+            url=f"/ebay/listings/{listing_id}/preview?message=Sandbox%20listing%20withdrawn%20and%20offer%20retained",
+            status_code=303,
+        )
+    except EbayError as exc:
+        db.rollback()
+        return _redirect_error(f"/ebay/listings/{listing_id}/preview", str(exc))
