@@ -14,7 +14,7 @@ from app.core.database import get_db
 from app.core.enums import InventoryStatus
 from app.models import Card, InventoryItem, Listing, ListingItem
 from app.services.ebay import EbayError
-from app.services.ebay_v06 import EbayV06Service
+from app.services.ebay_v06_runtime import EbayV06RuntimeService
 from app.services.intake import money_to_cents
 
 
@@ -22,8 +22,8 @@ router = APIRouter(prefix="/ebay", tags=["ebay"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
 
 
-def _service() -> EbayV06Service:
-    return EbayV06Service()
+def _service() -> EbayV06RuntimeService:
+    return EbayV06RuntimeService()
 
 
 def _redirect_error(path: str, message: str) -> RedirectResponse:
