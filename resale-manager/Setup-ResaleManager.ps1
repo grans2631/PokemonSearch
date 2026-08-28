@@ -36,7 +36,7 @@ function Resolve-PythonCommand {
     throw "Python 3.12+ was not found. Install Python 3.12 or newer and rerun this script."
 }
 
-$PythonCommand = Resolve-PythonCommand
+$PythonCommand = @(Resolve-PythonCommand)
 $PythonExe = $PythonCommand[0]
 $PythonArgs = @()
 if ($PythonCommand.Count -gt 1) { $PythonArgs = $PythonCommand[1..($PythonCommand.Count - 1)] }
