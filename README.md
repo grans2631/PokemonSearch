@@ -2,28 +2,28 @@
 
 This repository is evolving from the original **PokemonSearch** PowerShell toolkit into **Pokemon Resale Manager**, a self-hosted application for acquiring, cataloging, selling, and tracking Pokemon card inventory.
 
-The resale application lives under [`resale-manager/`](resale-manager/). The original PowerShell toolkit remains under [`src/PokemonSearch/`](src/PokemonSearch/) and is intentionally preserved while useful catalog, pricing, eBay, and collection functionality is incorporated into the new application.
+The resale application lives under [`resale-manager/`](resale-manager/). The original PowerShell toolkit remains under [`src/PokemonSearch/`](src/PokemonSearch/) and is intentionally preserved.
 
-## Current release: v0.5
+## Current release: v0.6
 
-v0.5 adds the first controlled eBay integration layer to the completed intake and Whatnot-first workflow.
+v0.6 completes the first safe eBay Sandbox publication loop and adds a one-command Windows/database bootstrap.
 
 ```text
-PURCHASE -> INTAKE -> READY
-                      |
-                      +-> WHATNOT_QUEUE -> SHOW BUILDER -> LIVE SHOW
-                                                       |
-                                                SHOW REPORT IMPORT
-                                                   /          \
-                                                SOLD       UNSOLD
-                                                 |             |
-                                               SALES       EBAY_QUEUE
-                                                               |
-                                                       LOCAL EBAY DRAFT
-                                                               |
-                                                       EBAY OFFER DRAFT
-                                                               |
-                                                       NOT PUBLISHED
+PURCHASE -> INTAKE -> WHATNOT -> RECONCILE -> EBAY_QUEUE
+                                               |
+                                         LOCAL CARD IMAGES
+                                               |
+                                         EBAY EPS IMAGES
+                                               |
+                                           OFFER DRAFT
+                                               |
+                                      TAXONOMY VALIDATION
+                                               |
+                                        HUMAN APPROVAL
+                                               |
+                                      SANDBOX PUBLISH
+                                               |
+                                      SANDBOX WITHDRAW
 ```
 
 Current capabilities include:
@@ -33,20 +33,19 @@ Current capabilities include:
 - storage locations
 - serialized and quantity inventory
 - immutable SKU generation
-- cost-allocation controls
 - Whatnot show creation and CSV export
 - final Show Report reconciliation
-- Whatnot order, fee, sale, and realized-profit capture
-- automatic SOLD and EBAY_QUEUE routing
-- Sales ledger and inventory audit events
-- eBay Sandbox/Production OAuth User authorization
-- eBay seller privilege, business-policy, and inventory-location retrieval
-- controlled local eBay drafts from `EBAY_QUEUE`
-- trading-card graded/ungraded condition mapping
-- Inventory API item + Offer draft synchronization
-- OAuth refresh-token handling and local secret storage
-
-**v0.5 does not publish eBay offers.** The eBay integration intentionally stops after creating/updating the Inventory API Offer draft so the first Sandbox tests cannot accidentally make inventory live.
+- Sales ledger and realized-profit tracking
+- eBay OAuth and seller policy/location retrieval
+- local eBay drafts from `EBAY_QUEUE`
+- actual card image storage and eBay Picture Services upload
+- eBay Taxonomy category/aspect validation
+- explicit listing preview/approval
+- controlled Sandbox `publishOffer` and `withdrawOffer`
+- Production publication blocked in v0.6
+- Windows `Setup-ResaleManager.ps1` bootstrap
+- automatic SQLite creation/migration at `resale-manager/data/pokemon_resale_manager.db`
+- database verifier for all 18 business tables
 
 See [`resale-manager/README.md`](resale-manager/README.md) for application setup and [`resale-manager/docs/ebay.md`](resale-manager/docs/ebay.md) for eBay Sandbox/OAuth setup.
 
