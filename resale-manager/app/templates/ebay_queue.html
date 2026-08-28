@@ -4,7 +4,7 @@
 <section class="page-header">
   <div>
     <h1>eBay Queue</h1>
-    <p>Inventory that has finished the Whatnot-first workflow and is ready for fixed-price eBay preparation.</p>
+    <p>Prepare, photograph, validate, preview, and test listings through the eBay Sandbox workflow.</p>
   </div>
   <div><a class="button" href="/ebay">eBay Settings</a></div>
 </section>
@@ -13,13 +13,15 @@
 {% if message %}<div class="success">{{ message }}</div>{% endif %}
 
 {% if not connection.connected %}
-<div class="error">eBay is not connected. You can still create local drafts, but syncing them to eBay requires OAuth connection.</div>
+<div class="error">eBay is not connected. Local images and local drafts can still be created, but Media/Taxonomy/Offer operations require OAuth.</div>
 {% endif %}
+
+<p><strong>Environment:</strong> {{ environment|upper }}{% if environment != "sandbox" %} · v0.6 publish and withdraw remain blocked outside Sandbox.{% endif %}</p>
 
 {% if items %}
 <table>
   <thead>
-    <tr><th>SKU</th><th>Card</th><th>Qty</th><th>Images</th><th>Price</th><th>Category</th><th>Draft / Offer</th><th>Action</th></tr>
+    <tr><th>SKU</th><th>Card</th><th>Qty</th><th>Images</th><th>Draft / Offer</th><th>Actions</th></tr>
   </thead>
   <tbody>
   {% for item in items %}
@@ -34,42 +36,59 @@
         {% else %}—{% endif %}
       </td>
       <td>{{ item.quantity_on_hand }}</td>
-      <td>{{ preview.image_count }} HTTPS</td>
-      {% if not draft %}
-      <td colspan="3">
-        <form id="draft-{{ item.inventory_id }}" method="post" action="/ebay/queue/{{ item.inventory_id }}/draft"></form>
-        <label>Title <input form="draft-{{ item.inventory_id }}" name="title" value="{{ preview.title }}" maxlength="80" style="min-width:25rem"></label><br>
-        <label>Price <input form="draft-{{ item.inventory_id }}" name="price" value="{{ '%.2f'|format(preview.price_cents/100) }}" style="width:7rem"></label>
-        <label>Category <input form="draft-{{ item.inventory_id }}" name="category_id" value="{{ selected.category_id }}" style="width:8rem"></label>
-      </td>
-      <td><button form="draft-{{ item.inventory_id }}" type="submit">Create Local Draft</button></td>
-      {% else %}
-      <td>${{ '%.2f'|format(draft.price_cents/100) }}</td>
-      <td>{{ selected.category_id }}</td>
       <td>
-        Local #{{ draft.listing_id }} · {{ draft.status }}
-        {% if draft.external_offer_id %}<br>eBay offer {{ draft.external_offer_id }}{% endif %}
-        {% if draft.last_error %}<br><small>{{ draft.last_error }}</small>{% endif %}
-      </td>
-      <td>
-        {% if draft.status != "ACTIVE" %}
-        <form method="post" action="/ebay/listings/{{ draft.listing_id }}/sync">
-          <button type="submit">Sync Draft to eBay</button>
+        {{ preview.local_image_count }} local / {{ preview.ebay_image_count }} eBay HTTPS
+        <form method="post" enctype="multipart/form-data" action="/ebay/queue/{{ item.inventory_id }}/image">
+          <input type="file" name="image" accept="image/jpeg,image/png" required>
+          <button type="submit">Add Image</button>
         </form>
-        <small>Does not publish</small>
-        {% else %}Active{% endif %}
+        {% for img in item.images|sort(attribute="image_order") %}
+          <div><small>#{{ img.image_order }} {{ "eBay ready" if img.external_url else "local only" }}</small>
+          {% if img.local_path and not img.external_url %}
+            <form method="post" action="/ebay/images/{{ img.image_id }}/upload-ebay" style="display:inline">
+              <button type="submit">Upload to eBay</button>
+            </form>
+          {% endif %}</div>
+        {% endfor %}
       </td>
-      {% endif %}
+      <td>
+        {% if draft %}
+          Local #{{ draft.listing_id }} · <strong>{{ draft.status }}</strong><br>
+          ${{ '%.2f'|format(draft.price_cents/100) }}
+          {% if draft.external_offer_id %}<br>Offer {{ draft.external_offer_id }}{% endif %}
+          {% if draft.external_listing_id %}<br>Listing {{ draft.external_listing_id }}{% endif %}
+          {% if draft.last_error %}<br><small>{{ draft.last_error }}</small>{% endif %}
+        {% else %}
+          Not drafted
+        {% endif %}
+      </td>
+      <td>
+        {% if not draft %}
+          <form method="post" action="/ebay/queue/{{ item.inventory_id }}/draft">
+            <label>Title <input name="title" value="{{ preview.title }}" maxlength="80" style="min-width:22rem"></label><br>
+            <label>Price <input name="price" value="{{ '%.2f'|format(preview.price_cents/100) }}" style="width:7rem"></label>
+            <label>Category <input name="category_id" value="{{ selected.category_id }}" style="width:8rem"></label>
+            <button type="submit">Create Local Draft</button>
+          </form>
+        {% else %}
+          {% if draft.status == "DRAFT" %}
+            <form method="post" action="/ebay/listings/{{ draft.listing_id }}/sync">
+              <button type="submit">Sync Offer Draft</button>
+            </form>
+          {% endif %}
+          <a class="button" href="/ebay/listings/{{ draft.listing_id }}/preview">Preview / Approve</a>
+        {% endif %}
+      </td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
 {% else %}
-<p>No inventory is currently in <code>EBAY_QUEUE</code>.</p>
+<p>No inventory is currently in <code>EBAY_QUEUE</code> or <code>EBAY_LISTED</code>.</p>
 {% endif %}
 
 <section>
-  <h2>Before a draft can sync</h2>
-  <p>The item needs at least one actual-card image with an HTTPS URL, the three selected eBay business policies, an eBay inventory location, a category ID, and a supported trading-card condition mapping.</p>
+  <h2>v0.6 listing gate</h2>
+  <p>Local image → eBay Picture Services → local draft → synchronized offer → Taxonomy validation → human approval → Sandbox publish. Production publish remains blocked.</p>
 </section>
 {% endblock %}
