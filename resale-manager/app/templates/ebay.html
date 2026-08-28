@@ -36,7 +36,7 @@
 
 <section>
   <h2>Listing defaults</h2>
-  <p>These are non-secret IDs from your eBay seller account. v0.5 uses them when creating an eBay offer draft; it does not publish the offer.</p>
+  <p>These are non-secret IDs from your eBay seller account. They are required before an Inventory API offer can be validated or published.</p>
   <form method="post" action="/ebay/settings">
     <label>Payment policy
       <select name="payment_policy_id" required>
@@ -79,7 +79,12 @@
 {% endif %}
 
 <section>
-  <h2>v0.5 safety boundary</h2>
-  <p>v0.5 can create local drafts and synchronize an Inventory API item + eBay offer draft. It intentionally does <strong>not</strong> call <code>publishOffer</code>, so no live listing is created by this release.</p>
+  <h2>v0.6 safety boundary</h2>
+  <p>v0.6 adds eBay Picture Services upload, Taxonomy validation, explicit listing preview/approval, and controlled <code>publishOffer</code>/<code>withdrawOffer</code> testing.</p>
+  {% if environment == "sandbox" %}
+    <div class="success">Sandbox publication is enabled only after a synchronized offer passes validation and is explicitly approved.</div>
+  {% else %}
+    <div class="error">Production publication remains intentionally blocked in v0.6.</div>
+  {% endif %}
 </section>
 {% endblock %}
