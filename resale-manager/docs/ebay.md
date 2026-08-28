@@ -1,44 +1,12 @@
-# eBay integration (v0.5)
+# eBay integration (v0.6)
 
-v0.5 adds eBay OAuth, seller-account readiness checks, business-policy/location selection, local eBay drafts, and synchronization of an Inventory API item + Offer draft.
+v0.6 extends the v0.5 OAuth/Offer-draft integration with actual inventory image handling, eBay Picture Services upload, Taxonomy validation, explicit human approval, and controlled Sandbox publish/withdraw testing.
 
-**v0.5 never calls `publishOffer`. Nothing becomes a live eBay listing from this release.**
+**Production publication remains blocked in v0.6.**
 
 ## 1. Start in eBay Sandbox
 
-Create or use an eBay Developer Program application and begin with the Sandbox keyset. You need:
-
-- Client ID (App ID)
-- Client Secret (Cert ID)
-- OAuth Redirect URL name (RuName)
-
-The application requests these User OAuth scopes:
-
-```text
-https://api.ebay.com/oauth/api_scope/sell.account
-https://api.ebay.com/oauth/api_scope/sell.inventory
-https://api.ebay.com/oauth/api_scope/sell.fulfillment
-```
-
-The fulfillment scope is included now so a later order-sync milestone does not immediately require another consent flow.
-
-## 2. Configure the RuName
-
-In the eBay Developer Portal, open the User Tokens settings for the same Sandbox or Production keyset and create/configure an OAuth Redirect URL name (RuName).
-
-The RuName's **Auth Accepted URL** must point to the running application's callback endpoint:
-
-```text
-https://YOUR-HTTPS-HOST/ebay/oauth/callback
-```
-
-eBay requires the consent flow to use the RuName value as the OAuth `redirect_uri`; the RuName itself contains the actual Accepted/Declined URLs.
-
-For a local-only installation, expose the application through an HTTPS-capable reverse proxy/tunnel or another HTTPS endpoint that the browser can reach during the consent redirect. Keep Sandbox and Production RuNames/keysets separate.
-
-## 3. Configure `.env`
-
-Copy `.env.example` to `.env` and fill in:
+Use an eBay Developer Program Sandbox keyset. Configure these values in `.env`:
 
 ```text
 EBAY_ENVIRONMENT=sandbox
@@ -50,90 +18,143 @@ EBAY_LOCALE=en-US
 EBAY_DEFAULT_CATEGORY_ID=183454
 ```
 
-The application now loads `.env` automatically at startup.
-
-`183454` is the default leaf category used by v0.5 for Collectible Card Games / Individual Cards. A different category can be entered for an individual local draft.
-
-## 4. Connect the seller account
-
-Start the app and open:
+The User OAuth consent flow requests:
 
 ```text
-/ebay
+https://api.ebay.com/oauth/api_scope/sell.account
+https://api.ebay.com/oauth/api_scope/sell.inventory
+https://api.ebay.com/oauth/api_scope/sell.fulfillment
 ```
 
-Choose **Connect eBay Seller Account**. After consent, eBay returns the authorization code to `/ebay/oauth/callback`; the app exchanges it for a User access token and refresh token.
+The application separately obtains an Application access token with the base eBay OAuth scope for Taxonomy/metadata and Media API operations.
 
-Tokens are stored locally under the configured data directory in:
+## 2. Configure the RuName
+
+In eBay Developer Portal, configure the Sandbox OAuth Redirect URL name (RuName). Its Accepted URL must point to:
+
+```text
+https://YOUR-HTTPS-HOST/ebay/oauth/callback
+```
+
+The `EBAY_RUNAME` value is the Redirect URL name, not the literal callback URL.
+
+## 3. Connect the seller account
+
+Open `/ebay` and choose **Connect eBay Seller Account**. Tokens are stored only in the local data directory:
 
 ```text
 data/ebay_oauth.json
 ```
 
-The file is excluded from Git and written with restrictive file permissions where the OS supports them. It is not stored in the SQLite database.
+They are excluded from Git and are not stored in SQLite.
 
-## 5. Seller readiness
+## 4. Select seller defaults
 
-After connection, the eBay page retrieves:
+The eBay page retrieves seller readiness, programs, payment policy, fulfillment policy, return policy, and Inventory API locations. Select all three business policies plus a merchant location and default category.
 
-- seller-registration/privilege status
-- opted-in seller programs
-- payment policies
-- fulfillment policies
-- return policies
-- Inventory API locations
+## 5. Add actual card images
 
-Inventory API offers require all three business-policy IDs and a merchant inventory location. The seller account must also be opted into eBay Selling Policy Management / Business Policies.
-
-Select one payment, fulfillment, and return policy plus an inventory location on the eBay settings page. These IDs are non-secret and are stored in `app_settings`.
-
-## 6. eBay queue workflow
-
-Open:
+On `/ebay/queue`, upload JPEG or PNG photos of the physical inventory item. Files are stored under:
 
 ```text
-/ebay/queue
+data/images/<SKU>/
 ```
 
-Only inventory in `EBAY_QUEUE` with quantity on hand is shown.
+They are tracked in `inventory_images` with a SHA-256 hash and local path.
 
-For each card:
+Choose **Upload to eBay** to send a local image to the eBay Media API `createImageFromFile` endpoint. The runtime uses the `apim.ebay.com` / `apim.sandbox.ebay.com` Media host. eBay's returned EPS HTTPS image URL is then stored in `inventory_images.external_url` and used by the Inventory API product payload.
 
-1. Review the generated title (max 80 characters).
-2. Review/set the fixed-price amount.
-3. Review/set the eBay category ID.
-4. Create the local draft.
-5. When prerequisites are satisfied, choose **Sync Draft to eBay**.
+## 6. Create and synchronize the draft
 
-The sync operation:
+Create the local draft from `EBAY_QUEUE`, then choose **Sync Offer Draft**. This:
 
-1. Calls `createOrReplaceInventoryItem` for our immutable SKU.
-2. Creates or updates an eBay Offer.
-3. Stores the returned `offerId` in the local `listings` row.
-4. Leaves the listing in local `PENDING` state.
-5. Does **not** call `publishOffer`.
+1. validates quantity, selected policies/location/category, trading-card condition mapping, and EPS image availability;
+2. calls `createOrReplaceInventoryItem` using our immutable SKU;
+3. creates or updates the eBay Offer;
+4. stores the returned `offerId`;
+5. leaves the local listing `PENDING` and unpublished.
 
-## 7. Trading-card condition mapping
+## 7. Taxonomy validation
 
-For the eBay trading-card categories, v0.5 follows eBay's Graded/Ungraded condition model.
+The listing Preview screen calls the Taxonomy API to:
 
-Ungraded inventory uses the Inventory API condition `USED_VERY_GOOD` with the trading-card condition descriptor:
+- resolve the marketplace category tree;
+- retrieve eBay category suggestions from the listing title;
+- retrieve item aspects for the selected category;
+- identify required and recommended aspects;
+- compare required aspect names against the aspects generated from our card metadata.
 
-- NM -> Near Mint or Better
-- LP -> Lightly Played
-- MP -> Moderately Played
-- HP / DMG -> Heavily Played / Poor
+The application currently supplies aspects such as Game, Card Name, Card Number, Set, Rarity, and Language when that metadata is available.
 
-Graded inventory uses `LIKE_NEW` plus eBay's Professional Grader and Grade condition descriptors. Common graders including PSA, BGS, CGC, SGC, TAG, ACE, and others are mapped. Certification number is passed when available.
+If a required eBay aspect is missing, approval is blocked.
 
-## 8. Images
+## 8. Human approval gate
 
-Before an Inventory API draft can sync, v0.5 requires at least one **actual inventory image** with an external HTTPS URL. Catalog/reference artwork is intentionally not substituted for a photograph of the physical card.
+Open **Preview / Approve** for the draft. Review:
 
-Image upload/hosting automation is not part of v0.5; that should be addressed before live publishing is enabled.
+- physical-card images
+- title
+- price
+- category
+- description
+- offer ID
+- supplied aspects
+- required/recommended Taxonomy aspects
+- validation errors
 
-## 9. Production cutover
+A synchronized `PENDING` offer cannot be published until the user explicitly checks the review acknowledgement and approves it.
 
-Do not change `EBAY_ENVIRONMENT` to `production` until Sandbox OAuth, seller-account retrieval, policy selection, inventory-item creation, and offer-draft creation have all been verified.
+Any later draft re-sync clears that approval and requires another review.
 
-Production uses a separate eBay Client ID, Client Secret, and RuName from Sandbox.
+## 9. Sandbox publish
+
+If `EBAY_ENVIRONMENT=sandbox`, an approved `PENDING` offer can call:
+
+```text
+POST /sell/inventory/v1/offer/{offerId}/publish
+```
+
+The returned eBay `listingId` is stored locally, listing state becomes `ACTIVE`, and inventory state becomes `EBAY_LISTED`.
+
+If the application is configured for Production, v0.6 rejects the publish operation before making the API request.
+
+## 10. Sandbox withdraw
+
+An active Sandbox listing can be withdrawn with:
+
+```text
+POST /sell/inventory/v1/offer/{offerId}/withdraw
+```
+
+The eBay Offer is retained in unpublished state, the local listing returns to `PENDING`, inventory returns to `EBAY_QUEUE`, and approval is cleared.
+
+## 11. Windows setup and database creation
+
+From the `resale-manager` directory, run:
+
+```powershell
+.\Setup-ResaleManager.ps1
+```
+
+The script:
+
+- locates Python 3.12+
+- creates `.venv`
+- installs dependencies
+- creates `.env` if missing
+- applies Alembic migrations
+- creates/updates `data/pokemon_resale_manager.db`
+- verifies all 18 business tables plus `alembic_version`
+
+Optional switches:
+
+```powershell
+.\Setup-ResaleManager.ps1 -SeedDemo
+.\Setup-ResaleManager.ps1 -Start
+```
+
+`-SeedDemo` should not be used for a clean production inventory database unless demo records are actually wanted.
+
+## Production cutover
+
+Production publishing is intentionally not implemented in v0.6. The Sandbox workflow should be proven end-to-end first: OAuth -> policies/location -> local image -> EPS image -> Inventory Item -> Offer -> Taxonomy validation -> approval -> publish -> withdraw.
