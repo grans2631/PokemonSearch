@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}eBay Listing Preview - Pokemon Resale Manager{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <h1>eBay Listing Preview</h1>
+    <p>Local #{{ listing.listing_id }} · {{ listing.status }} · {{ environment|upper }}</p>
+  </div>
+  <div><a class="button" href="/ebay/queue">Back to Queue</a></div>
+</section>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if message %}<div class="success">{{ message }}</div>{% endif %}
+
+<section>
+  <h2>Listing</h2>
+  <p><strong>SKU:</strong> {{ inventory.sku }}</p>
+  <p><strong>Title:</strong> {{ title }}</p>
+  <p><strong>Price:</strong> ${{ '%.2f'|format(price_cents/100) }}</p>
+  <p><strong>Category:</strong> {{ category_id }}</p>
+  <p><strong>Offer:</strong> {{ listing.external_offer_id or "Not synced" }}</p>
+  <p><strong>Listing ID:</strong> {{ listing.external_listing_id or "Not published" }}</p>
+  <pre>{{ description }}</pre>
+</section>
+
+<section>
+  <h2>Images</h2>
+  {% if images %}
+    {% for image in images %}
+      <div>
+        #{{ image.image_order }} · {{ "eBay ready" if image.external_url else "local only" }}
+        {% if image.external_url %}<br><small>{{ image.external_url }}</small>{% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No inventory images attached.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>eBay Taxonomy Validation</h2>
+  {% if taxonomy_error %}
+    <div class="error">{{ taxonomy_error }}</div>
+  {% elif taxonomy %}
+    <p>Category tree: {{ taxonomy.category_tree_id }}</p>
+    <p><strong>Supplied aspects:</strong></p>
+    <ul>{% for name, values in taxonomy.supplied_aspects.items() %}<li>{{ name }}: {{ values|join(", ") }}</li>{% endfor %}</ul>
+    <p><strong>Required aspects:</strong> {{ taxonomy.required_aspects|join(", ") if taxonomy.required_aspects else "None reported" }}</p>
+    {% if taxonomy.missing_required_aspects %}
+      <div class="error">Missing required: {{ taxonomy.missing_required_aspects|join(", ") }}</div>
+    {% endif %}
+    {% if taxonomy.recommended_aspects %}<p><strong>Recommended:</strong> {{ taxonomy.recommended_aspects[:15]|join(", ") }}</p>{% endif %}
+  {% endif %}
+
+  {% if suggestions %}
+    <h3>Category suggestions from eBay</h3>
+    <ul>
+    {% for suggestion in suggestions %}
+      <li>{{ suggestion.category.categoryName }} ({{ suggestion.category.categoryId }})</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Validation Gate</h2>
+  {% if errors %}
+    <div class="error">
+      <strong>Not ready:</strong>
+      <ul>{% for item in errors %}<li>{{ item }}</li>{% endfor %}</ul>
+    </div>
+  {% else %}
+    <div class="success">Base listing validation passed.</div>
+  {% endif %}
+
+  <p>Approval status: <strong>{{ "APPROVED" if approved else "NOT APPROVED" }}</strong></p>
+
+  {% if listing.status == "PENDING" and not approved and not errors and not taxonomy_error %}
+    <form method="post" action="/ebay/listings/{{ listing.listing_id }}/approve">
+      <p><label><input type="checkbox" required> I reviewed the card, photos, title, price, category, policies, and eBay aspect validation.</label></p>
+      <button type="submit">Approve Sandbox Listing</button>
+    </form>
+  {% endif %}
+
+  {% if listing.status == "PENDING" and approved %}
+    {% if environment == "sandbox" %}
+      <form method="post" action="/ebay/listings/{{ listing.listing_id }}/publish">
+        <button type="submit">Publish to eBay Sandbox</button>
+      </form>
+    {% else %}
+      <div class="error">Production publish is intentionally blocked in v0.6.</div>
+    {% endif %}
+  {% endif %}
+
+  {% if listing.status == "ACTIVE" %}
+    {% if environment == "sandbox" %}
+      <form method="post" action="/ebay/listings/{{ listing.listing_id }}/withdraw">
+        <button type="submit">Withdraw Sandbox Listing</button>
+      </form>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
