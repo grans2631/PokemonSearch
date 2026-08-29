@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Inventory - Pokemon Resale Manager{% endblock %}
 {% block content %}
+<div class="inventory-page">
 <div class="page-head">
   <div>
     <h1>Inventory</h1>
@@ -21,8 +22,8 @@
 </div>
 {% endif %}
 
-<form method="get" action="/inventory" class="inline-form" style="margin-bottom: 1rem;">
-  <input type="search" name="q" value="{{ search_query or '' }}" placeholder="Search SKU, card, set, number, variant, status, condition, or location" style="min-width: 380px;" />
+<form method="get" action="/inventory" class="inventory-search">
+  <input type="search" name="q" value="{{ search_query or '' }}" placeholder="Search SKU, card, set, number, variant, status, condition, or location" />
   {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}" />{% endif %}
   {% if sort_key %}<input type="hidden" name="sort" value="{{ sort_key }}" />{% endif %}
   {% if sort_key %}<input type="hidden" name="direction" value="{{ sort_direction }}" />{% endif %}
@@ -49,34 +50,35 @@
   </a>
 {%- endmacro %}
 
-<div class="table-wrap"><table>
+<div class="table-wrap"><table class="inventory-table">
 <thead><tr>
-  <th>{{ sort_link('SKU', 'sku') }}</th>
-  <th>{{ sort_link('Card', 'card') }}</th>
-  <th>{{ sort_link('Set', 'set') }} / {{ sort_link('#', 'number') }}</th>
-  <th>{{ sort_link('Status', 'status') }}</th>
-  <th>{{ sort_link('Condition', 'condition') }}</th>
-  <th>{{ sort_link('Qty', 'qty') }}</th>
-  <th>{{ sort_link('Cost', 'cost') }}</th>
-  <th>{{ sort_link('Market', 'market') }}</th>
-  <th>Price source</th>
-  <th>{{ sort_link('Updated', 'updated') }}</th>
-  <th>{{ sort_link('Location', 'location') }}</th>
-  <th>Workflow</th>
+  <th class="col-sku">{{ sort_link('SKU', 'sku') }}</th>
+  <th class="col-card">{{ sort_link('Card', 'card') }}</th>
+  <th class="col-set">{{ sort_link('Set', 'set') }} / {{ sort_link('#', 'number') }}</th>
+  <th class="col-status">{{ sort_link('Status', 'status') }}</th>
+  <th class="col-condition">{{ sort_link('Condition', 'condition') }}</th>
+  <th class="col-qty">{{ sort_link('Qty', 'qty') }}</th>
+  <th class="col-cost">{{ sort_link('Cost', 'cost') }}</th>
+  <th class="col-market">{{ sort_link('Market', 'market') }}</th>
+  <th class="col-source">Price source</th>
+  <th class="col-updated">{{ sort_link('Updated', 'updated') }}</th>
+  <th class="col-location">{{ sort_link('Location', 'location') }}</th>
+  <th class="col-workflow">Workflow</th>
 </tr></thead><tbody>
 {% for item in items %}<tr>
-<td class="mono">{{ item.sku }}</td>
-<td>{{ item.card.name if item.card else '—' }}</td>
-<td>{% if item.card %}{{ item.card.card_set.set_code }} · {{ item.card.card_number }}{% else %}—{% endif %}</td>
-<td><span class="pill">{{ item.status }}</span></td>
-<td>{{ item.condition or '—' }}{% if item.finish %}<br><span class="muted">{{ item.finish }}</span>{% endif %}</td>
-<td>{{ item.quantity_on_hand }}</td>
-<td>${{ '%.2f'|format(item.unit_cost_cents/100) }}</td>
-<td>{% if item.market_value_cents is not none %}${{ '%.2f'|format(item.market_value_cents/100) }}{% else %}—{% endif %}</td>
-<td class="mono">{{ item.market_value_source or '—' }}</td>
-<td>{% if item.market_value_updated_at %}{{ item.market_value_updated_at.strftime('%Y-%m-%d %H:%M') }}{% else %}—{% endif %}</td>
-<td class="mono">{{ item.location.location_code if item.location else 'Unassigned' }}</td>
-<td><form class="inline-form" method="post" action="/inventory/{{ item.inventory_id }}/status"><select name="status"><option value="READY">READY</option><option value="WHATNOT_QUEUE">WHATNOT_QUEUE</option><option value="EBAY_QUEUE">EBAY_QUEUE</option><option value="HOLD">HOLD</option><option value="PERSONAL">PERSONAL</option></select><button type="submit">Move</button></form></td>
+<td class="mono col-sku">{{ item.sku }}</td>
+<td class="col-card">{{ item.card.name if item.card else '—' }}</td>
+<td class="col-set">{% if item.card %}{{ item.card.card_set.set_code }} · {{ item.card.card_number }}{% else %}—{% endif %}</td>
+<td class="col-status"><span class="pill">{{ item.status }}</span></td>
+<td class="col-condition">{{ item.condition or '—' }}{% if item.finish %}<br><span class="muted">{{ item.finish }}</span>{% endif %}</td>
+<td class="col-qty">{{ item.quantity_on_hand }}</td>
+<td class="col-cost">${{ '%.2f'|format(item.unit_cost_cents/100) }}</td>
+<td class="col-market">{% if item.market_value_cents is not none %}${{ '%.2f'|format(item.market_value_cents/100) }}{% else %}—{% endif %}</td>
+<td class="mono col-source">{{ item.market_value_source or '—' }}</td>
+<td class="col-updated">{% if item.market_value_updated_at %}{{ item.market_value_updated_at.strftime('%Y-%m-%d %H:%M') }}{% else %}—{% endif %}</td>
+<td class="mono col-location">{{ item.location.location_code if item.location else 'Unassigned' }}</td>
+<td class="col-workflow"><form class="workflow-form" method="post" action="/inventory/{{ item.inventory_id }}/status"><select name="status"><option value="READY">READY</option><option value="WHATNOT_QUEUE">WHATNOT_QUEUE</option><option value="EBAY_QUEUE">EBAY_QUEUE</option><option value="HOLD">HOLD</option><option value="PERSONAL">PERSONAL</option></select><button type="submit">Move</button></form></td>
 </tr>{% else %}<tr><td colspan="12" class="muted">No inventory matched your current search/filter.</td></tr>{% endfor %}
 </tbody></table></div>
+</div>
 {% endblock %}
