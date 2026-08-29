@@ -21,11 +21,24 @@
 </div>
 {% endif %}
 
+<form method="get" action="/inventory" class="inline-form" style="margin-bottom: 1rem;">
+  <input type="search" name="q" value="{{ search_query or '' }}" placeholder="Search SKU, card, set, number, variant, status, condition, or location" style="min-width: 380px;" />
+  {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}" />{% endif %}
+  <button type="submit">Search</button>
+  {% if search_query %}<a class="button secondary" href="/inventory{% if status_filter %}?status={{ status_filter }}{% endif %}">Clear</a>{% endif %}
+</form>
+
 <div class="stats-grid">
   <div class="stat"><span class="muted">Displayed market value</span><strong>${{ '%.2f'|format(total_market_cents/100) }}</strong></div>
+  <div class="stat"><span class="muted">Displayed items</span><strong>{{ items|length }}</strong></div>
 </div>
 
-<div class="filters"><a href="/inventory">All</a><a href="/inventory?status=READY">Ready</a><a href="/inventory?status=WHATNOT_QUEUE">Whatnot Queue</a><a href="/inventory?status=EBAY_QUEUE">eBay Queue</a></div>
+<div class="filters">
+  <a href="/inventory{% if search_query %}?q={{ search_query|urlencode }}{% endif %}">All</a>
+  <a href="/inventory?status=READY{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Ready</a>
+  <a href="/inventory?status=WHATNOT_QUEUE{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Whatnot Queue</a>
+  <a href="/inventory?status=EBAY_QUEUE{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">eBay Queue</a>
+</div>
 <div class="table-wrap"><table>
 <thead><tr><th>SKU</th><th>Card</th><th>Set / #</th><th>Status</th><th>Condition</th><th>Qty</th><th>Cost</th><th>Market</th><th>Price source</th><th>Updated</th><th>Location</th><th>Workflow</th></tr></thead><tbody>
 {% for item in items %}<tr>
@@ -41,6 +54,6 @@
 <td>{% if item.market_value_updated_at %}{{ item.market_value_updated_at.strftime('%Y-%m-%d %H:%M') }}{% else %}—{% endif %}</td>
 <td class="mono">{{ item.location.location_code if item.location else 'Unassigned' }}</td>
 <td><form class="inline-form" method="post" action="/inventory/{{ item.inventory_id }}/status"><select name="status"><option value="READY">READY</option><option value="WHATNOT_QUEUE">WHATNOT_QUEUE</option><option value="EBAY_QUEUE">EBAY_QUEUE</option><option value="HOLD">HOLD</option><option value="PERSONAL">PERSONAL</option></select><button type="submit">Move</button></form></td>
-</tr>{% else %}<tr><td colspan="12" class="muted">No inventory yet. Start with a purchase intake.</td></tr>{% endfor %}
+</tr>{% else %}<tr><td colspan="12" class="muted">No inventory matched your current search/filter.</td></tr>{% endfor %}
 </tbody></table></div>
 {% endblock %}
