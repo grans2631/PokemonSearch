@@ -56,7 +56,14 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/inventory")
-def inventory_page(request: Request, status: str | None = None, q: str | None = None, db: Session = Depends(get_db)):
+def inventory_page(
+    request: Request,
+    status: str | None = None,
+    q: str | None = None,
+    sort: str | None = None,
+    direction: str = "asc",
+    db: Session = Depends(get_db),
+):
     stmt = (
         select(InventoryItem)
         .outerjoin(InventoryItem.card)
@@ -67,7 +74,6 @@ def inventory_page(request: Request, status: str | None = None, q: str | None = 
             joinedload(InventoryItem.location),
             joinedload(InventoryItem.purchase),
         )
-        .order_by(InventoryItem.inventory_id.desc())
     )
     if status:
         stmt = stmt.where(InventoryItem.status == status.upper())
@@ -93,12 +99,38 @@ def inventory_page(request: Request, status: str | None = None, q: str | None = 
             )
         )
 
+    sort_key = (sort or "").strip().lower()
+    sort_direction = "desc" if direction.lower() == "desc" else "asc"
+    sort_columns = {
+        "sku": InventoryItem.sku,
+        "card": Card.name,
+        "set": CardSet.set_code,
+        "number": Card.card_number,
+        "status": InventoryItem.status,
+        "condition": InventoryItem.condition,
+        "qty": InventoryItem.quantity_on_hand,
+        "cost": InventoryItem.unit_cost_cents,
+        "market": InventoryItem.market_value_cents,
+        "updated": InventoryItem.market_value_updated_at,
+        "location": StorageLocation.location_code,
+    }
+    sort_column = sort_columns.get(sort_key)
+    if sort_column is not None:
+        order_expression = sort_column.desc() if sort_direction == "desc" else sort_column.asc()
+        stmt = stmt.order_by(order_expression.nullslast(), InventoryItem.inventory_id.desc())
+    else:
+        sort_key = ""
+        sort_direction = "asc"
+        stmt = stmt.order_by(InventoryItem.inventory_id.desc())
+
     items = db.scalars(stmt).unique().all()
     total_market_cents = sum((item.market_value_cents or 0) * item.quantity_on_hand for item in items)
     return templates.TemplateResponse(request=request, name="inventory.html", context={
         "items": items,
         "status_filter": status,
         "search_query": search_query,
+        "sort_key": sort_key,
+        "sort_direction": sort_direction,
         "total_market_cents": total_market_cents,
         "pricing_checked": request.query_params.get("pricing_checked"),
         "pricing_matched": request.query_params.get("pricing_matched"),
