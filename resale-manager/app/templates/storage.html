@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Storage - Pokemon Resale Manager{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Storage Locations</h1><p class="muted">Use simple codes such as B01-R02-S014 so cards can be found quickly during packing.</p></div></div>
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+<form class="panel form-grid" method="post" action="/storage">
+<label>Location code<input name="location_code" placeholder="B01-R02-S014" required></label>
+<label>Name<input name="name" placeholder="Bin 1 / Row 2 / Slot 14" required></label>
+<label>Type<select name="location_type"><option>BIN</option><option>ROW</option><option selected>SLOT</option><option>BOX</option><option>SHELF</option><option>OTHER</option></select></label>
+<label>Parent<select name="parent_location_id"><option value="">None</option>{% for location in locations %}<option value="{{ location.location_id }}">{{ location.location_code }}</option>{% endfor %}</select></label>
+<label class="span-2">Notes<input name="notes"></label>
+<div class="span-2 actions"><button class="button" type="submit">Add Location</button></div>
+</form>
+<h2>Locations</h2>
+<div class="table-wrap"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Parent</th><th>Active</th></tr></thead><tbody>
+{% for location in locations %}<tr><td class="mono">{{ location.location_code }}</td><td>{{ location.name }}</td><td>{{ location.location_type }}</td><td>{{ location.parent.location_code if location.parent else '—' }}</td><td>{{ 'Yes' if location.active else 'No' }}</td></tr>{% else %}<tr><td colspan="5" class="muted">No storage locations yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

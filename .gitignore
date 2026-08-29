@@ -1,16 +1,32 @@
 # Secrets / local configuration
 config.json
 .env
+*.env
+!.env.example
 *.secrets.json
 
-# Collection and generated data
+# Legacy PokemonSearch collection/generated data
 data/collection.json
 data/cache/*.json
 data/price-history/*.json
 
+# Pokemon Resale Manager local/generated data
+resale-manager/data/*.db
+resale-manager/data/*.sqlite
+resale-manager/data/*.sqlite3
+resale-manager/data/images/
+resale-manager/imports/*
+!resale-manager/imports/.gitkeep
+resale-manager/exports/*
+!resale-manager/exports/.gitkeep
+
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .venv/
 venv/
 

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}Pokemon Resale Manager{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css?v=20260828-2">
+</head>
+<body>
+<header>
+  <div class="brand">Pokemon Resale Manager <span>v0.6 · UI 2026.08.28.2</span></div>
+  <nav>
+    <a href="/">Dashboard</a>
+    <a href="/inventory">Inventory</a>
+    <a href="/purchases">Purchases</a>
+    <a href="/whatnot">Whatnot</a>
+    <a href="/ebay">eBay</a>
+    <a href="/sales">Sales</a>
+    <a href="/storage">Storage</a>
+    <a href="/docs">API</a>
+  </nav>
+</header>
+<main class="{% block main_class %}{% endblock %}">{% block content %}{% endblock %}</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

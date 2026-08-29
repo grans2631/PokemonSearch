@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}eBay - Pokemon Resale Manager{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <h1>eBay</h1>
+    <p>{{ environment|upper }} · {{ marketplace_id }}</p>
+  </div>
+  <div><a class="button" href="/ebay/queue">Open eBay Queue</a></div>
+</section>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if api_error %}<div class="error">{{ api_error }}</div>{% endif %}
+{% if message %}<div class="success">{{ message }}</div>{% endif %}
+
+<section>
+  <h2>Connection</h2>
+  {% if not status.configured %}
+    <p>eBay credentials are not configured. Add EBAY_CLIENT_ID, EBAY_CLIENT_SECRET, and EBAY_RUNAME to <code>.env</code>.</p>
+  {% elif status.connected %}
+    <p><strong>Connected.</strong> Refresh token: {{ "available" if status.has_refresh_token else "not available" }}.</p>
+    <form method="post" action="/ebay/disconnect"><button type="submit">Disconnect eBay</button></form>
+  {% else %}
+    <p>The application is configured but no seller account is connected.</p>
+    <a class="button" href="/ebay/connect">Connect eBay Seller Account</a>
+  {% endif %}
+</section>
+
+{% if snapshot %}
+<section>
+  <h2>Seller readiness</h2>
+  <p>Seller registration: <strong>{{ "Complete" if snapshot.privileges.get("sellerRegistrationCompleted") else "Not complete" }}</strong></p>
+  <p>Selling Policy Management: <strong>{{ "Enabled" if snapshot.policy_management_enabled else "Not enabled" }}</strong></p>
+  {% if snapshot.privileges.get("sellingLimit") %}<pre>{{ snapshot.privileges.get("sellingLimit") }}</pre>{% endif %}
+</section>
+
+<section>
+  <h2>Listing defaults</h2>
+  <p>These are non-secret IDs from your eBay seller account. They are required before an Inventory API offer can be validated or published.</p>
+  <form method="post" action="/ebay/settings">
+    <label>Payment policy
+      <select name="payment_policy_id" required>
+        <option value="">Select…</option>
+        {% for p in snapshot.payment_policies %}
+        <option value="{{ p.paymentPolicyId }}" {% if selected.payment_policy_id == p.paymentPolicyId %}selected{% endif %}>{{ p.name }} ({{ p.paymentPolicyId }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Fulfillment policy
+      <select name="fulfillment_policy_id" required>
+        <option value="">Select…</option>
+        {% for p in snapshot.fulfillment_policies %}
+        <option value="{{ p.fulfillmentPolicyId }}" {% if selected.fulfillment_policy_id == p.fulfillmentPolicyId %}selected{% endif %}>{{ p.name }} ({{ p.fulfillmentPolicyId }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Return policy
+      <select name="return_policy_id" required>
+        <option value="">Select…</option>
+        {% for p in snapshot.return_policies %}
+        <option value="{{ p.returnPolicyId }}" {% if selected.return_policy_id == p.returnPolicyId %}selected{% endif %}>{{ p.name }} ({{ p.returnPolicyId }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Inventory location
+      <select name="merchant_location_key" required>
+        <option value="">Select…</option>
+        {% for location in snapshot.locations %}
+        <option value="{{ location.merchantLocationKey }}" {% if selected.merchant_location_key == location.merchantLocationKey %}selected{% endif %}>{{ location.name or location.merchantLocationKey }} ({{ location.merchantLocationKey }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Default category ID
+      <input name="category_id" value="{{ selected.category_id }}" required>
+    </label>
+    <button type="submit">Save eBay Defaults</button>
+  </form>
+</section>
+{% endif %}
+
+<section>
+  <h2>v0.6 safety boundary</h2>
+  <p>v0.6 adds eBay Picture Services upload, Taxonomy validation, explicit listing preview/approval, and controlled <code>publishOffer</code>/<code>withdrawOffer</code> testing.</p>
+  {% if environment == "sandbox" %}
+    <div class="success">Sandbox publication is enabled only after a synchronized offer passes validation and is explicitly approved.</div>
+  {% else %}
+    <div class="error">Production publication remains intentionally blocked in v0.6.</div>
+  {% endif %}
+</section>
+{% endblock %}

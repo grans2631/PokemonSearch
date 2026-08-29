@@ -1,0 +1,10 @@
+[project]
+name = "pokemon-resale-manager"
+version = "0.1.0"
+description = "Inventory, marketplace workflow, and profit tracking for a Pokemon card resale business."
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
