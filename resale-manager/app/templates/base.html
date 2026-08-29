@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{% block title %}Pokemon Resale Manager{% endblock %}</title>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/app.css?v=20260828-2">
 </head>
 <body>
 <header>
-  <div class="brand">Pokemon Resale Manager <span>v0.6</span></div>
+  <div class="brand">Pokemon Resale Manager <span>v0.6 · UI 2026.08.28.2</span></div>
   <nav>
     <a href="/">Dashboard</a>
     <a href="/inventory">Inventory</a>
@@ -21,5 +21,6 @@
   </nav>
 </header>
 <main class="{% block main_class %}{% endblock %}">{% block content %}{% endblock %}</main>
+{% block scripts %}{% endblock %}
 </body>
 </html>
