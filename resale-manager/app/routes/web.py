@@ -7,12 +7,12 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.core.enums import InventoryStatus, InventoryType, TrackingMode
-from app.models import Card, InventoryItem, Purchase, Sale, StorageLocation
+from app.models import Card, CardSet, InventoryItem, Purchase, Sale, StorageLocation
 from app.services.intake import (
     create_inventory_item,
     create_purchase,
@@ -56,19 +56,49 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/inventory")
-def inventory_page(request: Request, status: str | None = None, db: Session = Depends(get_db)):
-    stmt = select(InventoryItem).options(
-        joinedload(InventoryItem.card).joinedload(Card.card_set),
-        joinedload(InventoryItem.location),
-        joinedload(InventoryItem.purchase),
-    ).order_by(InventoryItem.inventory_id.desc())
+def inventory_page(request: Request, status: str | None = None, q: str | None = None, db: Session = Depends(get_db)):
+    stmt = (
+        select(InventoryItem)
+        .outerjoin(InventoryItem.card)
+        .outerjoin(Card.card_set)
+        .outerjoin(InventoryItem.location)
+        .options(
+            joinedload(InventoryItem.card).joinedload(Card.card_set),
+            joinedload(InventoryItem.location),
+            joinedload(InventoryItem.purchase),
+        )
+        .order_by(InventoryItem.inventory_id.desc())
+    )
     if status:
         stmt = stmt.where(InventoryItem.status == status.upper())
-    items = db.scalars(stmt).all()
+
+    search_query = (q or "").strip()
+    if search_query:
+        term = f"%{search_query}%"
+        stmt = stmt.where(
+            or_(
+                InventoryItem.sku.ilike(term),
+                InventoryItem.status.ilike(term),
+                InventoryItem.condition.ilike(term),
+                InventoryItem.finish.ilike(term),
+                InventoryItem.variant_label.ilike(term),
+                InventoryItem.language.ilike(term),
+                Card.name.ilike(term),
+                Card.card_number.ilike(term),
+                Card.rarity.ilike(term),
+                CardSet.name.ilike(term),
+                CardSet.set_code.ilike(term),
+                StorageLocation.location_code.ilike(term),
+                StorageLocation.name.ilike(term),
+            )
+        )
+
+    items = db.scalars(stmt).unique().all()
     total_market_cents = sum((item.market_value_cents or 0) * item.quantity_on_hand for item in items)
     return templates.TemplateResponse(request=request, name="inventory.html", context={
         "items": items,
         "status_filter": status,
+        "search_query": search_query,
         "total_market_cents": total_market_cents,
         "pricing_checked": request.query_params.get("pricing_checked"),
         "pricing_matched": request.query_params.get("pricing_matched"),
