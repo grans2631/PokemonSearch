@@ -23,14 +23,17 @@
 </div>
 {% endif %}
 
-<form method="get" action="/inventory" class="inventory-search">
-  <input type="search" name="q" value="{{ search_query or '' }}" placeholder="Search SKU, card, set, number, variant, status, condition, or location" />
-  {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}" />{% endif %}
-  {% if sort_key %}<input type="hidden" name="sort" value="{{ sort_key }}" />{% endif %}
-  {% if sort_key %}<input type="hidden" name="direction" value="{{ sort_direction }}" />{% endif %}
-  <button type="submit">Search</button>
-  {% if search_query %}<a class="button secondary" href="/inventory{% if status_filter or sort_key %}?{% endif %}{% if status_filter %}status={{ status_filter }}{% endif %}{% if status_filter and sort_key %}&{% endif %}{% if sort_key %}sort={{ sort_key }}&direction={{ sort_direction }}{% endif %}">Clear</a>{% endif %}
-</form>
+<div class="inventory-toolbar">
+  <strong>Find cards:</strong>
+  <form method="get" action="/inventory" class="inventory-search">
+    <input id="inventory-search-box" type="search" name="q" value="{{ search_query or '' }}" placeholder="Type card name, SKU, set, card #, variant, status, condition, or location..." />
+    {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}" />{% endif %}
+    {% if sort_key %}<input type="hidden" name="sort" value="{{ sort_key }}" />{% endif %}
+    {% if sort_key %}<input type="hidden" name="direction" value="{{ sort_direction }}" />{% endif %}
+    <button type="submit">Search Inventory</button>
+    {% if search_query %}<a class="button secondary" href="/inventory{% if status_filter or sort_key %}?{% endif %}{% if status_filter %}status={{ status_filter }}{% endif %}{% if status_filter and sort_key %}&{% endif %}{% if sort_key %}sort={{ sort_key }}&direction={{ sort_direction }}{% endif %}">Clear</a>{% endif %}
+  </form>
+</div>
 
 <div class="stats-grid">
   <div class="stat"><span class="muted">Displayed market value</span><strong>${{ '%.2f'|format(total_market_cents/100) }}</strong></div>
@@ -51,7 +54,11 @@
   </a>
 {%- endmacro %}
 
-<div class="table-wrap"><table class="inventory-table">
+<div class="inventory-scroll-top" id="inventory-scroll-top" aria-label="Horizontal inventory scrollbar">
+  <div class="inventory-scroll-top-inner" id="inventory-scroll-top-inner"></div>
+</div>
+
+<div class="table-wrap" id="inventory-table-wrap"><table class="inventory-table" id="inventory-table">
 <thead><tr>
   <th class="col-sku">{{ sort_link('SKU', 'sku') }}</th>
   <th class="col-card">{{ sort_link('Card', 'card') }}</th>
@@ -82,4 +89,34 @@
 </tr>{% else %}<tr><td colspan="12" class="muted">No inventory matched your current search/filter.</td></tr>{% endfor %}
 </tbody></table></div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const top = document.getElementById('inventory-scroll-top');
+  const topInner = document.getElementById('inventory-scroll-top-inner');
+  const wrap = document.getElementById('inventory-table-wrap');
+  const table = document.getElementById('inventory-table');
+  if (!top || !topInner || !wrap || !table) return;
+
+  function syncWidth() {
+    topInner.style.width = table.scrollWidth + 'px';
+  }
+  let syncing = false;
+  top.addEventListener('scroll', function () {
+    if (syncing) return;
+    syncing = true;
+    wrap.scrollLeft = top.scrollLeft;
+    syncing = false;
+  });
+  wrap.addEventListener('scroll', function () {
+    if (syncing) return;
+    syncing = true;
+    top.scrollLeft = wrap.scrollLeft;
+    syncing = false;
+  });
+  window.addEventListener('resize', syncWidth);
+  syncWidth();
+})();
+</script>
 {% endblock %}
