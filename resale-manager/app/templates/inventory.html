@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1>Inventory</h1>
-    <p class="muted">Physical inventory, editable workflow state, storage location, and current market pricing.</p>
+    <p class="muted">Physical inventory, editable workflow state, storage location, current market pricing, search, and sorting.</p>
   </div>
   <div class="inline-form">
     <form method="post" action="/inventory/pricing/refresh">
@@ -24,8 +24,10 @@
 <form method="get" action="/inventory" class="inline-form" style="margin-bottom: 1rem;">
   <input type="search" name="q" value="{{ search_query or '' }}" placeholder="Search SKU, card, set, number, variant, status, condition, or location" style="min-width: 380px;" />
   {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}" />{% endif %}
+  {% if sort_key %}<input type="hidden" name="sort" value="{{ sort_key }}" />{% endif %}
+  {% if sort_key %}<input type="hidden" name="direction" value="{{ sort_direction }}" />{% endif %}
   <button type="submit">Search</button>
-  {% if search_query %}<a class="button secondary" href="/inventory{% if status_filter %}?status={{ status_filter }}{% endif %}">Clear</a>{% endif %}
+  {% if search_query %}<a class="button secondary" href="/inventory{% if status_filter or sort_key %}?{% endif %}{% if status_filter %}status={{ status_filter }}{% endif %}{% if status_filter and sort_key %}&{% endif %}{% if sort_key %}sort={{ sort_key }}&direction={{ sort_direction }}{% endif %}">Clear</a>{% endif %}
 </form>
 
 <div class="stats-grid">
@@ -34,13 +36,34 @@
 </div>
 
 <div class="filters">
-  <a href="/inventory{% if search_query %}?q={{ search_query|urlencode }}{% endif %}">All</a>
-  <a href="/inventory?status=READY{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Ready</a>
-  <a href="/inventory?status=WHATNOT_QUEUE{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Whatnot Queue</a>
-  <a href="/inventory?status=EBAY_QUEUE{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">eBay Queue</a>
+  <a href="/inventory{% if search_query or sort_key %}?{% endif %}{% if search_query %}q={{ search_query|urlencode }}{% endif %}{% if search_query and sort_key %}&{% endif %}{% if sort_key %}sort={{ sort_key }}&direction={{ sort_direction }}{% endif %}">All</a>
+  <a href="/inventory?status=READY{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if sort_key %}&sort={{ sort_key }}&direction={{ sort_direction }}{% endif %}">Ready</a>
+  <a href="/inventory?status=WHATNOT_QUEUE{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if sort_key %}&sort={{ sort_key }}&direction={{ sort_direction }}{% endif %}">Whatnot Queue</a>
+  <a href="/inventory?status=EBAY_QUEUE{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if sort_key %}&sort={{ sort_key }}&direction={{ sort_direction }}{% endif %}">eBay Queue</a>
 </div>
+
+{% macro sort_link(label, key) -%}
+  {% set next_direction = 'desc' if sort_key == key and sort_direction == 'asc' else 'asc' %}
+  <a href="/inventory?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}sort={{ key }}&direction={{ next_direction }}">
+    {{ label }}{% if sort_key == key %} {{ '▲' if sort_direction == 'asc' else '▼' }}{% endif %}
+  </a>
+{%- endmacro %}
+
 <div class="table-wrap"><table>
-<thead><tr><th>SKU</th><th>Card</th><th>Set / #</th><th>Status</th><th>Condition</th><th>Qty</th><th>Cost</th><th>Market</th><th>Price source</th><th>Updated</th><th>Location</th><th>Workflow</th></tr></thead><tbody>
+<thead><tr>
+  <th>{{ sort_link('SKU', 'sku') }}</th>
+  <th>{{ sort_link('Card', 'card') }}</th>
+  <th>{{ sort_link('Set', 'set') }} / {{ sort_link('#', 'number') }}</th>
+  <th>{{ sort_link('Status', 'status') }}</th>
+  <th>{{ sort_link('Condition', 'condition') }}</th>
+  <th>{{ sort_link('Qty', 'qty') }}</th>
+  <th>{{ sort_link('Cost', 'cost') }}</th>
+  <th>{{ sort_link('Market', 'market') }}</th>
+  <th>Price source</th>
+  <th>{{ sort_link('Updated', 'updated') }}</th>
+  <th>{{ sort_link('Location', 'location') }}</th>
+  <th>Workflow</th>
+</tr></thead><tbody>
 {% for item in items %}<tr>
 <td class="mono">{{ item.sku }}</td>
 <td>{{ item.card.name if item.card else '—' }}</td>
